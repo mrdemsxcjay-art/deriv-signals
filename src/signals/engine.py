@@ -162,9 +162,9 @@ def run_cycle(settings: Dict[str, Any], db_path: Optional[str] = None,
                 expiry_bars=P.get("expiry_bars_m15", 96))
         except Exception as exc:  # noqa: BLE001
             res.errors.append(f"tracker: {exc}")
-        if notify and res.signals:  # étape 5 : envoi Telegram (jamais bloquant)
+        if notify:  # étape 5+ : envois Telegram entrée + clôtures (jamais bloquants)
             try:
-                from ..notify.telegram import notify_signals
+                from ..notify.telegram import notify_closes, notify_signals
                 for r in notify_signals(res.signals):
                     if r.get("status") == "sent" and r.get("instrument") in res.logs:
                         res.logs[r["instrument"]] += " 📩"
@@ -172,6 +172,20 @@ def run_cycle(settings: Dict[str, Any], db_path: Optional[str] = None,
                         res.errors.append(
                             f"telegram {r.get('signal_id')}: "
                             f"{r.get('reason', r.get('error'))}")
+                closes = [o for o in (res.tracker or [])
+                          if o.get("result") in ("TP", "SL", "EXPIRE")]
+                if closes:
+                    stats = db.get_stats(db_path)
+                    items = [(sg, o) for o in closes
+                             for sg in [db.get_signal(db_path, o.get("signal_id"))]
+                             if sg is not None]
+                    for r in notify_closes(items, stats):
+                        if r.get("status") == "sent" and r.get("instrument") in res.logs:
+                            res.logs[r["instrument"]] += " 📪"
+                        elif r.get("status") != "sent":
+                            res.errors.append(
+                                f"telegram clôture {r.get('signal_id')}: "
+                                f"{r.get('reason', r.get('error'))}")
             except Exception as exc:  # noqa: BLE001
                 res.errors.append(f"telegram: {exc}")
     finally:

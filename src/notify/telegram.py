@@ -75,6 +75,16 @@ def _utc(epoch: int) -> str:
     return datetime.fromtimestamp(epoch, tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
 
+def _hm(epoch: Any) -> str:
+    """Date courte JJ/MM HH:MM (UTC)."""
+    if epoch is None:
+        return "—"
+    try:
+        return datetime.fromtimestamp(int(epoch), tz=timezone.utc).strftime("%d/%m %H:%M")
+    except (TypeError, ValueError, OSError):
+        return "—"
+
+
 def _synthetic_lines(ctx: Dict[str, Any]) -> List[str]:
     """Puces du CONTEXTE SYNTHÉTIQUE (défensif : clés manquantes = lignes sautées)."""
     lines, ctx = [], ctx or {}
@@ -108,28 +118,81 @@ def _synthetic_lines(ctx: Dict[str, Any]) -> List[str]:
 
 
 def format_signal(sig: Any) -> str:
-    """Message signal HTML. `sig` : Signal (ou dict équivalent pour les tests)."""
+    """Message d'entrée : sens + prix + score + contexte synthétique."""
     g = (lambda k, d=None: sig.get(k, d)) if isinstance(sig, dict) else (lambda k, d=None: getattr(sig, k, d))
     emoji, side = SIDES.get(g("direction"), ("⚪", esc(g("direction"))))
     instrument = g("instrument", "?")
     label = LABELS.get(instrument, instrument)
     confs = g("confluences") or []
     lines = [
-        f"{emoji} <b>{side} {esc(instrument)} — {esc(label)}</b>",
-        f"🕒 {esc(_utc(g('created_epoch', 0)))} · 🆔 <code>{esc(g('id'))}</code>",
+        f"{emoji} <b>{side} · {esc(instrument)}</b>",
+        f"{esc(label)} · {_hm(g('created_epoch', 0))} UTC",
         "",
         f"💰 <b>Entrée :</b> <code>{_f2(g('entry'))}</code>",
-        f"🛑 <b>SL :</b> <code>{_f2(g('sl_price'))}</code> (−{_f1(g('sl_pts'))} pts)",
-        f"🎯 <b>TP :</b> <code>{_f2(g('tp_price'))}</code> (+{_f1(g('tp_pts'))} pts · ratio 1:3)",
-        f"💵 Stake fixe : {_f2(g('stake_usd'))} $",
+        f"🛑 <b>Stop :</b> <code>{_f2(g('sl_price'))}</code> (−{_f1(g('sl_pts'))} pts)",
+        f"🎯 <b>Objectif :</b> <code>{_f2(g('tp_price'))}</code> (+{_f1(g('tp_pts'))} pts)",
+        f"📐 Ratio 1:3 · 💵 Risque {_f2(g('stake_usd'))} $",
         "",
-        f"⭐ <b>Score : {_fi(g('confidence'))}/100 ({esc(g('grade'))})</b>",
-        *[f"• {esc(c)}" for c in confs],
+        f"⭐ <b>{_fi(g('confidence'))}/100 · Grade {esc(g('grade'))}</b>",
+        *[f"✅ {esc(c)}" for c in confs],
         "",
         "🧪 <b>CONTEXTE SYNTHÉTIQUE</b>",
         *_synthetic_lines(g("context") or {}),
         "",
+        f"🆔 <code>{esc(g('id'))}</code>",
         DISCLAIMER,
+    ]
+    return "\n".join(lines)
+
+
+OUTCOMES = {"TP": ("✅", "OBJECTIF ATTEINT"), "SL": ("🛑", "STOP TOUCHÉ"),
+            "EXPIRE": ("⌛", "EXPIRE SANS DÉCISION")}
+
+
+def _duree(bars: Any) -> str:
+    """Tenue en clair depuis un nombre de bougies M15."""
+    try:
+        mins = int(bars or 0) * 15
+    except (TypeError, ValueError):
+        return "—"
+    if mins < 60:
+        return f"{mins} min"
+    if mins < 1440:
+        return f"{mins // 60}h{mins % 60:02d}"
+    return f"{mins // 1440}j {(mins % 1440) // 60}h"
+
+
+def _r_str(r: Any) -> str:
+    try:
+        v = float(r)
+    except (TypeError, ValueError):
+        return "—"
+    return f"+{_f1(v)}R" if v >= 0 else f"{_f1(v)}R"
+
+
+def format_outcome(sig: Any, out: Any, stats: dict | None = None) -> str:
+    """Message de clôture : résultat + sortie + tenue + R cumulé."""
+    gs = (lambda k, d=None: sig.get(k, d)) if isinstance(sig, dict) else (lambda k, d=None: getattr(sig, k, d))
+    go = (lambda k, d=None: out.get(k, d)) if isinstance(out, dict) else (lambda k, d=None: getattr(out, k, d))
+    emoji, word = OUTCOMES.get(go("result"), ("⚪", esc(go("result"))))
+    instrument = gs("instrument", "?")
+    side = SIDES.get(gs("direction"), ("", "?"))[1]
+    pts = go("points")
+    try:
+        pts_str = f"+{_f1(pts)} pts" if float(pts) >= 0 else f"{_f1(pts)} pts"
+    except (TypeError, ValueError):
+        pts_str = "—"
+    st = stats or {}
+    wr = st.get("winrate")
+    wr_str = f"{100 * wr:.0f} %" if isinstance(wr, (int, float)) else "—"
+    lines = [
+        f"{emoji} <b>{word} · {esc(instrument)} {esc(side)}</b>",
+        f"💰 Entrée <code>{_f2(gs('entry'))}</code> → Sortie <code>{_f2(go('exit_price'))}</code>",
+        f"📊 Résultat : <b>{_r_str(go('r'))}</b> ({pts_str})",
+        f"⏱️ Tenue : {_duree(go('bars_held'))} ({_fi(go('bars_held'))} × M15)",
+        f"📈 Cumul : <b>{_r_str(st.get('r_total'))}</b> · {_fi(st.get('TP'))} TP / {_fi(st.get('SL'))} SL · winrate {wr_str}",
+        "",
+        f"🆔 <code>{esc(gs('id'))}</code> · clôturé le {_hm(go('closed_epoch'))} UTC",
     ]
     return "\n".join(lines)
 
@@ -198,3 +261,30 @@ def notify_signals(signals: List[Any]) -> List[dict]:
             out.append({"signal_id": g(s, "id"), "instrument": g(s, "instrument"),
                         "status": "error", "error": str(e)})
     return out
+
+
+def notify_closes(items: List[tuple], stats: dict | None = None) -> List[dict]:
+    """Envoie chaque clôture (signal, outcome). Ne lève jamais."""
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+    chat = os.environ.get("TELEGRAM_CHAT_ID", "")
+
+    def g(obj, k):
+        return obj.get(k) if isinstance(obj, dict) else getattr(obj, k, "?")
+
+    if not token or not chat:
+        return [{"signal_id": g(o, "signal_id"), "instrument": g(s, "instrument"),
+                 "status": "skipped",
+                 "reason": "TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID absents"}
+                for s, o in items]
+    out = []
+    for sig, oc in items:
+        try:
+            r = send_html(token, chat, format_outcome(sig, oc, stats))
+            out.append({"signal_id": g(oc, "signal_id"), "instrument": g(sig, "instrument"),
+                        "status": "sent", "message_id": r.get("message_id")})
+        except TelegramError as e:
+            log.warning("envoi clôture %s échoué : %s", g(oc, "signal_id"), e)
+            out.append({"signal_id": g(oc, "signal_id"), "instrument": g(sig, "instrument"),
+                        "status": "error", "error": str(e)})
+    return out
+

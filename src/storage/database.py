@@ -92,6 +92,16 @@ def get_open_signals(path: str) -> List[Dict[str, Any]]:
         return [_row_to_dict(cur, r) for r in cur.fetchall()]
 
 
+def get_signal(path: str, signal_id: str) -> Optional[Dict[str, Any]]:
+    """Un signal par son id (dict, JSON décodés) ou None."""
+    if not os.path.exists(path):
+        return None
+    with sqlite3.connect(path) as con:
+        cur = con.execute("SELECT * FROM signals WHERE id=?", (signal_id,))
+        row = cur.fetchone()
+        return _row_to_dict(cur, row) if row else None
+
+
 def count_since(path: str, instrument: str, since_epoch: int) -> int:
     """Nombre de signaux émis pour l'instrument depuis `since_epoch` (anti-spam)."""
     if not os.path.exists(path):

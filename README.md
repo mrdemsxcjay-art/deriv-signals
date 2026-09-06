@@ -93,6 +93,13 @@ Résultats (R / 21 j) — calibration : base −24,3 (175 signaux, 8,3/j) → **
 **V10 : 0 TP sur 243 signaux** (calib + valid, marché plat −0,45 % ET tendanciel −2,19 %) → ⏸️ **pause proposée**. Sans V10 : calib **+23R** (4,4/j) ; valid **+9R** (**2,3/j** ✓ cible 2-3/j).
 Pistes rejetées par mesure : seuil 50 (≈ base), SL V10 resserré (pire : −19 à −24R), fraîcheur H4, scores 85+ (toxiques : bonus « retest DANS zone » +10 contre-productif — retests à dist 0 : −5,4/−3,0/−13,0R).
 
+## 📨 Notifications Telegram (étapes 5+)
+
+- **Entrée** : `🔴 VENTE · BOOM1000` — prix (Entrée/Stop/Objectif), ratio 1:3, risque, score + grade, confluences ✅, CONTEXTE SYNTHÉTIQUE obligatoire, disclaimer.
+- **Clôture** : `✅ OBJECTIF ATTEINT` / `🛑 STOP TOUCHÉ` / `⌛ EXPIRE SANS DÉCISION` — entrée → sortie, résultat en R et points, tenue, **R cumulé** + TP/SL + winrate.
+- Logs moteur : `📩` = entrée notifiée, `📪` = clôture notifiée. Envois jamais bloquants (erreurs loggées, exit 1).
+- Aperçu des rendus : `docs/message_preview.html`.
+
 ## 🚀 Déploiement (Étape 6 — 100 % gratuit)
 
 **Repo PUBLIC recommandé** : minutes GitHub Actions illimitées + page statut publique.
