@@ -62,7 +62,7 @@ deriv-signals/
 | 3 | Pipeline 5 portes + spécialisations JD10/BOOM + scoring + SQLite | ✅ en validation |
 | 4 | Calibration replay 21 j + validation 21 j hors-échantillon (C3 : +13,0R calib / +6,9R valid ; V10 0/243 TP → ⏸️ pause V10 actée) | ✅ validée |
 | 5 | Messages Telegram HTML + message TEST | ✅ validée |
-| 6 | Moteur GitHub Actions unique + cache base + page statut publique | ▶️ en cours |
+| 6 | Moteur GitHub Actions unique + cache base + page statut publique | ✅ validée |
 
 ## 📏 Calibration Étape 2 (mesures réelles du 06/09/2026 — priment sur le spec initial)
 
