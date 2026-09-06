@@ -1,8 +1,0 @@
-# ⏳ STUB ÉTAPE 6 — étapes communes du cycle (restauration/cache base SQLite).
-name: cycle-common-stub
-description: Livré à l'étape 6.
-runs:
-  using: composite
-  steps:
-    - run: echo "Action commune livrée à l'étape 6."
-      shell: bash

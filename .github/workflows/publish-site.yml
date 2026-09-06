@@ -1,8 +1,0 @@
-# ⏳ STUB ÉTAPE 6 — page de statut GitHub Pages (export statique).
-name: publish-site (stub etape 6)
-on: workflow_dispatch
-jobs:
-  stub:
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "Page statut livrée à l'étape 6."
