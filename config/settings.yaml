@@ -1,0 +1,136 @@
+# ============================================================
+# ROBOT DE SIGNAUX — INDICES SYNTHÉTIQUES DERIV
+# V10 (R_10) · JD10 (Jump 10) · BOOM1000 — analyse uniquement
+# 100 % gratuit — aucun ordre exécuté, signaux Telegram only
+# ============================================================
+
+deriv:
+  ws_url: "wss://ws.derivws.com/websockets/v3?app_id=1089"
+  app_id: 1089
+  timeout: 20
+  # Respect des limites de débit Deriv : pause mini entre 2 requêtes
+  throttle_seconds: 0.35
+  # Reconnexion : backoff exponentiel 1s, 2s, 4s, 8s, 16s
+  max_retries: 5
+  backoff_base: 1.0
+
+# --- Instruments EXCLUSIFS (règle n°1 non-négociable) ---
+instruments:
+  V10:
+    symbol: "R_10"
+    label: "Volatility 10 Index"
+    enabled: false  # Étape 4 validée : PAUSE (0 TP / 243 signaux, 42 j, 2 régimes)
+  JD10:
+    symbol: "JD10"
+    label: "Jump 10 Index"
+    enabled: true
+  BOOM1000:
+    symbol: "BOOM1000"
+    label: "Boom 1000 Index"
+    enabled: true
+
+# --- Timeframes requis : D1, H4, H1, M30, M15, M5 ---
+timeframes:
+  M5: 300
+  M15: 900
+  M30: 1800
+  H1: 3600
+  H4: 14400
+  D1: 86400
+
+# --- Nombre de bougies à télécharger par timeframe (mode --once / cycle) ---
+# Calibré pour : indicateurs (EMA200 ⇒ besoin ≥ 250 bougies) + contexte
+# synthétique (30 jours de M15, 50 derniers spikes) tout en restant rapide.
+counts:
+  M5: 1000
+  # M15 = 3000 : besoin mesuré §5 (percentile ATR 30 j = 2 880 bougies + marge).
+  # Vérifié : 3 000 bougies en 1 requête (~2 s), 0 trou.
+  M15: 3000
+  M30: 1000
+  H1: 1000
+  H4: 800
+  # D1 = 365 : PLAFOND MESURÉ côté Deriv (historique D1 ≈ 1 an : toute demande
+  # ≥ 366 rend 365 bougies). Suffisant pour EMA200 (besoin ≥ 250).
+  D1: 365
+
+cache:
+  dir: "data/cache"
+  enabled: true
+
+# --- Analyse SMC / indicateurs (Étape 2 — valeurs par défaut, affinage étape 4) ---
+analysis:
+  swing_strength: 2     # fractale 5 bougies (Bill Williams)
+  rsi_period: 14
+  atr_period: 14
+  ob_lookback: 5        # bougies remontées pour trouver l'origine de l'impulsion
+  pinbar_body_max: 0.333
+  pinbar_wick_mult: 2.0
+  eq_atr_mult: 0.1      # tolérance EQH/EQL = 0,1 × ATR
+
+# --- Contexte synthétique (Étape 2 — seuils CALIBRÉS par mesure, 06/09/2026) ---
+synthetics:
+  spike_timeframe: "M5"
+  spike_window: 100
+  spike_multiplier: 3.0   # mesuré : 36 min ≈ cible 30-35 (4,0 ⇒ 48 min, rejeté)
+  spike_stats_window: 50
+  jump_feed: "ticks"      # gaps M5 abandonnés (5 gaps/17 j) → ticks (|Δ|>seuil)
+  jump_threshold_pts: 10.0  # mesuré : corps p99,9=7,2 < 10 < 11,2 plus petit jump
+  jump_tick_cache_max: 40000  # ≈ 11 h à ~1 tick/s
+  jump_stats_window: 20
+  drift_h1_window: 500    # dérive BOOM = MÉDIANE des variations H1 (robuste aux spikes)
+
+# --- Planchers SL provisoires (points) — À RECALIBRER par replay ≥ 21 j (étape 4) ---
+stops:
+  V10: 25
+  JD10: 40
+  BOOM1000: 25  # Étape 4 : 50→25 (optimum intérieur, grille 60→20 ; 20 = falaise)
+
+# --- Règles petit compte (inviolables) ---
+account:
+  stake_usd: 1.0        # stake FIXE, jamais recalculée, jamais de martingale
+  min_stake_usd: 0.20   # minimum Deriv
+  tp_ratio: 3.0         # TP = 3 × risque exactement
+
+# --- Stratégie : pipeline 5 portes (§4 — Étape 3, provisoires → replay étape 4) ---
+strategy:
+  ema_d1: 200
+  ema_h4_fast: 50
+  ema_h4_slow: 200
+  ema_h1: 50
+  swing_strength: 2
+  m15_max_break_age: 4    # Étape 4 : 18→4 (grille 18/10/6/4, total −24,3→−11,5R)
+  m15_retest_atr_mult: 1.2   # retest ≤ 1,2 ATR
+  atr_period: 14
+  rsi_period: 14
+  rsi_margin: 5              # RSI H1 ≥ 55 (achat) / ≤ 45 (vente)
+  strength_min: 0.5          # corps/range bougie signal
+  regime_lo: 10              # bonus régime : percentile ATR dans [10, 90]
+  regime_hi: 90
+  v10_lo: 33                 # bonus contexte V10 : percentile dans [33, 66]
+  v10_hi: 66
+  boom_sell_spike_mult: 2.0  # SELL aligné si spike ≤ 2 × intervalle moyen
+  boom_buy_max_age_min: 20  # Étape 4 : 45→20 — BUY uniquement si spike ≤ 20 min
+  jump_sl_mult: 4.0         # Étape 4 : 1.5→4.0 — SL JD10 ≥ 4,0 × jump médian (grille monotone, plateau 4.0=5.0)
+  expiry_bars_m15: 96        # EXPIRE après 96 M15 (24 h) sans TP/SL
+
+storage:
+  path: "data/signals.db"
+
+# --- Scoring / émission (Étape 3-4, rappelés ici pour traçabilité) ---
+scoring:
+  threshold: 65
+  grades:
+    B: [65, 74]
+    A: [75, 84]
+    A_plus: [85, 100]
+  max_per_day_per_instrument: 4
+  cooldown_minutes: 180
+
+# --- Telegram (secrets via variables d'environnement en prod) ---
+telegram:
+  # En local : export TELEGRAM_BOT_TOKEN=... TELEGRAM_CHAT_ID=...
+  # En CI : secrets GitHub TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID
+  parse_mode: "HTML"
+
+logging:
+  level: "INFO"   # DEBUG | INFO | WARNING | ERROR

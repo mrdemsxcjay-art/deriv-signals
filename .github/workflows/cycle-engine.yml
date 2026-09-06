@@ -1,0 +1,10 @@
+# ⏳ STUB ÉTAPE 6 — LE moteur unique (cron */5 + manuel).
+# Rappel : UN SEUL moteur (jamais deux workflows qui se relaient — GitHub coupe
+# les chaînes après 3 runs et cela crée des bases dupliquées → signaux en double).
+name: cycle-engine (stub etape 6)
+on: workflow_dispatch
+jobs:
+  stub:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Moteur réel livré à l'étape 6."

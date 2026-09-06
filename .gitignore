@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+# Calibration étape 4 : volumineux, déjà résumée dans le README (reproductible via replay)
+data/replay_*.db
+data/replay_*.json
+data/backtest/
+# Cache Deriv local : re-téléchargeable (en CI : actions/cache)
+data/cache/
+# Live : data/signals.db est VOLONTAIREMENT versionné (état cooldown/quota/tracker)
