@@ -71,7 +71,7 @@ jobs:
         run: |
           git config user.name "deriv-bot"
           git config user.email "deriv-bot@users.noreply.github.com"
-          git add data/signals.db docs/index.html
+          git add data/signals.db docs/index.html data/paper.db
           git diff --cached --quiet && echo "rien à committer" && exit 0
           git commit -m "🤖 live : $(date -u '+%d/%m %H:%M UTC')"
           ok=0
