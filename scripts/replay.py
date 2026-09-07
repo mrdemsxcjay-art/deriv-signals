@@ -3,7 +3,7 @@ CLI replay — calibration sur N jours de données réelles (Étape 4).
 
 Usage :
   python scripts/replay.py --days 21
-  python scripts/replay.py --days 21 --set scoring.threshold=70 --set stops.V10=30
+  python scripts/replay.py --days 21 --set scoring.threshold=70 --set stops.JD10=45
   python scripts/replay.py --days 21 --refresh          # re-télécharge tout
   python scripts/replay.py --days 7 --step-min 60       # rapide (test)
 

@@ -2,8 +2,8 @@
 Test ÉTAPE 2b — Contexte synthétique (§5) : spikes, jumps, régimes.
 
 - Checks 1-2 : séries SYNTHÉTIQUES exactes (spike @105 ratio 5,0 ; jumps +25/-40).
-- Checks 3-5 : DONNÉES RÉELLES (bandes de plausibilité calibrées) + contextes §5.
-- Check 6 : PREUVE ANTI-REPAINT sur données réelles (fenêtres croissantes).
+- Checks 3-4 : DONNÉES RÉELLES (bandes de plausibilité calibrées) + contextes §5.
+- Check 5 : PREUVE ANTI-REPAINT sur données réelles (fenêtres croissantes).
 
 Exécution : python scripts/test_synth.py
 """
@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.data.deriv_provider import DerivProvider
 from src.synthetics.context import (
-    boom_context, detect_jumps, detect_spikes, jump_context, v10_context,
+    boom_context, detect_jumps, detect_spikes, jump_context,
 )
 
 CHECKS = []
@@ -27,7 +27,7 @@ def check(name):
     return deco
 
 
-@check("1/6 Spike synthétique — 1 seul spike @105, ratio exact 5,0")
+@check("1/5 Spike synthétique — 1 seul spike @105, ratio exact 5,0")
 def t_spike_synth():
     flat = [{"epoch": 1000 + i, "open": 100.0, "high": 101.0, "low": 99.0, "close": 100.0}
             for i in range(120)]
@@ -42,7 +42,7 @@ def t_spike_synth():
     print(f"   spike unique @105 (amp=10, méd=2, ratio=5.0) ; baissier @108 ignoré ✅")
 
 
-@check("2/6 Jumps synthétiques — +25 UP et −40 DN aux ticks exacts")
+@check("2/5 Jumps synthétiques — +25 UP et −40 DN aux ticks exacts")
 def t_jump_synth():
     ticks = [{"epoch": 2000 + k, "price": 100.0 + (k % 2) * 0.5} for k in range(30)]
     ticks[10]["price"] = ticks[9]["price"] + 25.0
@@ -58,7 +58,7 @@ def t_jump_synth():
     print(f"   jumps {got} ✅")
 
 
-@check("3/6 RÉEL — spikes BOOM1000 M5 (~1/36 min, mult 3,0)")
+@check("3/5 RÉEL — spikes BOOM1000 M5 (~1/36 min, mult 3,0)")
 def t_spike_real():
     p = DerivProvider()
     try:
@@ -78,7 +78,7 @@ def t_spike_real():
         p.close()
 
 
-@check("4/6 RÉEL — jumps JD10 ticks (~3/h, seuil 10 pts)")
+@check("4/5 RÉEL — jumps JD10 ticks (~3/h, seuil 10 pts)")
 def t_jump_real():
     p = DerivProvider()
     try:
@@ -97,25 +97,7 @@ def t_jump_real():
         p.close()
 
 
-@check("5/6 RÉEL — contexte V10 (ATR M15 + percentile 30 j + vitesse M5)")
-def t_v10_real():
-    p = DerivProvider()
-    try:
-        m5 = p.get_candles("R_10", 300, 1000)
-        m15 = p.get_candles("R_10", 900, 3000)
-        ctx = v10_context(m5, m15)
-        print(f"   ATR_M15={ctx['atr_m15']:.2f} pct30j={ctx['atr_percentile_30d']:.0f} "
-              f"régime={ctx['regime']} vitesse={ctx['candle_speed_pts_per_min']:.3f}pts/min")
-        assert ctx["atr_m15"] is not None and ctx["atr_m15"] > 0
-        assert ctx["atr_percentile_30d"] is not None
-        assert 0 <= ctx["atr_percentile_30d"] <= 100
-        assert ctx["regime"] in ("calme", "normal", "tendu")
-        assert 0 < ctx["candle_speed_pts_per_min"] <= 5
-    finally:
-        p.close()
-
-
-@check("6/6 PREUVE ANTI-REPAINT réelle — spikes/jumps stables (fenêtres croissantes)")
+@check("5/5 PREUVE ANTI-REPAINT réelle — spikes/jumps stables (fenêtres croissantes)")
 def t_norepaint_real():
     p = DerivProvider()
     try:

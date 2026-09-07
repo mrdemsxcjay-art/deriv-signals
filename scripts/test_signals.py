@@ -51,7 +51,7 @@ U = mk(  # M15 haussière : BOS bull @6 (niveau 10,8), clôture 11,3
     [9.7, 10.0, 10.3, 10.5, 10.4, 10.6, 10.9, 11.1, 11.1],
     [10.0, 10.3, 10.6, 10.4, 10.3, 10.8, 11.2, 11.0, 11.3], base=2000)
 
-FLOORS = {"V10": 25.0, "JD10": 40.0, "BOOM1000": 50.0}
+FLOORS = {"JD10": 40.0, "BOOM1000": 50.0}
 
 
 @check("1/8 Portes D1/H1/M15 — verdicts et valeurs exacts (série A)")
@@ -106,20 +106,19 @@ def t_sl_risk():
     assert abs(sl - 65.7) < 1e-9 and "65.7" in note, (sl, note)
     assert stop_points("JD10", {"median_size": 10.0}, FLOORS)[0] == 40.0  # plancher
     assert stop_points("JD10", {}, FLOORS)[0] == 40.0                     # stats ? → plancher
-    assert stop_points("V10", {}, FLOORS) == (25.0, "SL plancher V10 = 25.0 pts")
+    assert stop_points("BOOM1000", {}, FLOORS) == (50.0, "SL plancher BOOM1000 = 50.0 pts")
     assert jump_risk_label(30, 43.8, 86.9)[0] == "ÉLEVÉ"
     assert jump_risk_label(65.7, 43.8, 86.9)[0] == "MOYEN"
     assert jump_risk_label(90, 43.8, 86.9)[0] == "FAIBLE"
     assert jump_risk_label(40, None, None)[0] == "INCONNU"
-    assert context_aligned("V10", "bullish", {"vol": {"percentile": 50}}, 25, {})[0] is True
-    assert context_aligned("V10", "bullish", {"vol": {"percentile": 5}}, 25, {})[0] is False
+    assert context_aligned("JD10", "bullish", {"jump": {}}, 90, {})[0] is False  # P90 ? → pas de bonus
     assert context_aligned("JD10", "bullish", {"jump": {"p90_size": 86.9}}, 90, {})[0] is True
     assert context_aligned("JD10", "bullish", {"jump": {"p90_size": 86.9}}, 65.7, {})[0] is False
     b = {"boom": {"time_since_spike_min": 30, "avg_interval_min": 36}}
     assert context_aligned("BOOM1000", "bearish", b, 50, {})[0] is True
     b["boom"]["time_since_spike_min"] = 100
     assert context_aligned("BOOM1000", "bearish", b, 50, {})[0] is False
-    print("   SL 65.7/40/25 · risque É/M/F/I · contextes V10/JD10/BOOM ✅")
+    print("   SL 65.7/40/25 · risque É/M/F/I · contextes JD10/BOOM ✅")
 
 
 @check("5/8 BOOM BUY — bloqué sans spike récent, 80/A avec spike + pin M5")
@@ -172,17 +171,17 @@ def t_tracker():
 def t_db_antispam():
     tmp = os.path.join(tempfile.mkdtemp(), "t.db")
     db.init_db(tmp)
-    sig = Signal(id="V10-bearish-100", instrument="V10", symbol="R_10", direction="bearish",
+    sig = Signal(id="JD10-bearish-100", instrument="JD10", symbol="JD10", direction="bearish",
                  created_epoch=100, entry_epoch=90, entry=10.0, sl_pts=25.0, tp_pts=75.0,
                  sl_price=35.0, tp_price=-65.0, stake_usd=1.0, confidence=70, grade="B")
-    sig2 = Signal(id="V10-bullish-200", instrument="V10", symbol="R_10", direction="bullish",
+    sig2 = Signal(id="JD10-bullish-200", instrument="JD10", symbol="JD10", direction="bullish",
                   created_epoch=200, entry_epoch=190, entry=10.0, sl_pts=25.0, tp_pts=75.0,
                   sl_price=-15.0, tp_price=85.0, stake_usd=1.0, confidence=80, grade="A")
     db.save_signal(tmp, sig)
     db.save_signal(tmp, sig2)
     assert len(db.get_open_signals(tmp)) == 2
-    assert db.last_created(tmp, "V10") == 200 and db.count_since(tmp, "V10", 150) == 1
-    db.close_signal(tmp, {"signal_id": "V10-bearish-100", "closed_epoch": 300, "result": "TP",
+    assert db.last_created(tmp, "JD10") == 200 and db.count_since(tmp, "JD10", 150) == 1
+    db.close_signal(tmp, {"signal_id": "JD10-bearish-100", "closed_epoch": 300, "result": "TP",
                           "r": 3.0, "points": 75.0, "bars_held": 5, "exit_price": -65.0, "note": ""})
     st = db.get_stats(tmp)
     assert (st["n"], st["TP"], st["winrate"], st["r_total"], st["open"]) == (1, 1, 1.0, 3.0, 1), st
@@ -214,7 +213,7 @@ def t_db_antispam():
         def close(self):
             pass
 
-    settings = {"instruments": {"V10": {"symbol": "R_10"}, "JD10": {"symbol": "JD10"},
+    settings = {"instruments": {"JD10": {"symbol": "JD10"},
                                 "BOOM1000": {"symbol": "BOOM1000"}},
                 "timeframes": {"M5": 300, "M15": 900, "M30": 1800, "H1": 3600,
                                "H4": 14400, "D1": 86400},
@@ -241,26 +240,26 @@ def t_db_antispam():
     try:
         tmp2 = os.path.join(tempfile.mkdtemp(), "m.db")
         r1 = run_cycle(settings, db_path=tmp2, provider=FakeProvider(NOON), now_epoch=NOON)
-        assert len(r1.signals) == 3, [s.id for s in r1.signals]
+        assert len(r1.signals) == 2, [s.id for s in r1.signals]
         r2 = run_cycle(settings, db_path=tmp2, provider=FakeProvider(NOON + 600),
                        now_epoch=NOON + 600)
         assert len(r2.signals) == 0 and all("cooldown" in v for v in r2.logs.values()), r2.logs
-        for i in range(4):  # quota V10 (4/jour déjà émis dans run1+prefill → bloque)
-            db.save_signal(tmp2, {"id": f"pre-{i}", "instrument": "V10", "symbol": "R_10",
+        for i in range(4):  # quota JD10 (4/jour déjà émis dans run1+prefill → bloque)
+            db.save_signal(tmp2, {"id": f"pre-{i}", "instrument": "JD10", "symbol": "JD10",
                                   "direction": "bearish", "created_epoch": NOON + 100,
                                   "entry_epoch": 1, "entry": 1.0, "sl_pts": 1.0, "tp_pts": 3.0,
                                   "sl_price": 2.0, "tp_price": -2.0, "stake_usd": 1.0,
                                   "confidence": 70, "grade": "B"})
         r3 = run_cycle(settings, db_path=tmp2, provider=FakeProvider(NOON + 200 * 60),
                        now_epoch=NOON + 200 * 60)
-        assert "quota" in r3.logs["V10"] and len(r3.signals) == 2, r3.logs
+        assert "quota" in r3.logs["JD10"] and len(r3.signals) == 1, r3.logs
         state["score"] = 60
         r4 = run_cycle(settings, db_path=tmp2, provider=FakeProvider(NOON + 400 * 60),
                        now_epoch=NOON + 400 * 60)
         assert len(r4.signals) == 0 and all("score 60 < 65" in v for v in r4.logs.values())
     finally:
         ENG.evaluate_instrument = real_eval
-    print("   moteur : 3 émis → cooldown → quota V10 → seuil 60<65 ✅")
+    print("   moteur : 2 émis → cooldown → quota JD10 → seuil 60<65 ✅")
 
 
 @check("8/8 RÉEL — cycle complet + déterminisme (2 évaluations identiques)")
@@ -272,7 +271,7 @@ def t_real_cycle():
     res = run_cycle(settings, db_path=tmp)
     expected = {n for n, i in settings["instruments"].items() if i.get("enabled", True)}
     assert set(res.logs) == expected, res.logs
-    assert "V10" not in res.logs  # pause V10 (étape 4 validée)
+    assert "V10" not in res.logs  # V10 supprime (07/09/2026)
     for inst, line in res.logs.items():
         print(f"   {inst:>9} : {line}")
         assert line, "log vide !"
@@ -283,17 +282,17 @@ def t_real_cycle():
     from src.data.deriv_provider import DerivProvider
     p = DerivProvider()
     try:
-        tf = {t: p.get_timeframe("R_10", t, settings["counts"][t])
+        tf = {t: p.get_timeframe("JD10", t, settings["counts"][t])
               for t in settings["timeframes"]}
         P = dict(settings.get("strategy", {}))
         P["synthetics_params"] = settings.get("synthetics", {})
-        ctx = build_contexts("V10", tf, None, P)
-        d1 = evaluate_instrument("V10", tf, ctx, P, settings["stops"])
-        d2 = evaluate_instrument("V10", tf, ctx, P, settings["stops"])
+        ctx = build_contexts("JD10", tf, None, P)
+        d1 = evaluate_instrument("JD10", tf, ctx, P, settings["stops"])
+        d2 = evaluate_instrument("JD10", tf, ctx, P, settings["stops"])
         assert (d1.passed, d1.blocked_by, d1.score, d1.grade) == \
                (d2.passed, d2.blocked_by, d2.score, d2.grade)
         assert d1.plan == d2.plan
-        print(f"   déterminisme : 2× Mars ({d1.blocked_by or d1.score}) identiques ✅")
+        print(f"   déterminisme : 2× JD10 ({d1.blocked_by or d1.score}) identiques ✅")
     finally:
         p.close()
 

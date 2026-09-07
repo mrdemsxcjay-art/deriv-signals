@@ -15,7 +15,7 @@ from ..storage import database as db
 from . import models as PM
 from . import store as PStore
 
-SYM = {"V10": "R_10", "JD10": "JD10", "BOOM1000": "BOOM1000"}
+SYM = {"JD10": "JD10", "BOOM1000": "BOOM1000"}
 
 
 def check_frozen(paper_db: str) -> None:

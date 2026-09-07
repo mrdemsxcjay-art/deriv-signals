@@ -34,9 +34,9 @@ def t_ping():
         p.close()
 
 
-@check("2/6 Symboles exclusifs R_10 / JD10 / BOOM1000")
+@check("2/6 Symboles exclusifs JD10 / BOOM1000")
 def t_symbols():
-    assert ALLOWED_SYMBOLS == {"R_10", "JD10", "BOOM1000"}, ALLOWED_SYMBOLS
+    assert ALLOWED_SYMBOLS == {"JD10", "BOOM1000"}, ALLOWED_SYMBOLS
     p = DerivProvider(ws_url=WS_URL)
     try:
         for sym in sorted(ALLOWED_SYMBOLS):
@@ -53,7 +53,7 @@ def t_symbols():
         p.close()
 
 
-@check("3/6 Téléchargement 6 TF × 3 instruments + qualité (fraîcheur, trous, OHLC)")
+@check("3/6 Téléchargement 6 TF × 2 instruments + qualité (fraîcheur, trous, OHLC)")
 def t_all_timeframes():
     p = DerivProvider(ws_url=WS_URL)
     try:
@@ -69,7 +69,7 @@ def t_all_timeframes():
                     f"clôture={rep['last_close_utc']} (âge {rep['age_seconds']}s) "
                     f"trous={rep['gaps']} dupl={rep['duplicates']} ohlc={rep['ohlc_errors']}"
                 )
-        assert n_ok == 18, f"{18 - n_ok} série(s) en anomalie"
+        assert n_ok == 12, f"{12 - n_ok} série(s) en anomalie"
     finally:
         p.close()
 
@@ -93,15 +93,15 @@ def t_cache():
     p = DerivProvider(ws_url=WS_URL, cache_dir="data/cache")
     try:
         t0 = time.time()
-        c1 = p.get_candles("R_10", 900, 300)
+        c1 = p.get_candles("JD10", 900, 300)
         d1 = time.time() - t0
         t0 = time.time()
-        c2 = p.get_candles("R_10", 900, 300)
+        c2 = p.get_candles("JD10", 900, 300)
         d2 = time.time() - t0
         assert len(c1) == 300, f"profondeur {len(c1)} au lieu de 300"
         assert c1[-1]["epoch"] == c2[-1]["epoch"], "cache incohérent"
         print(f"   1er appel {d1:.2f}s ({len(c1)} bougies) → 2e appel {d2:.2f}s (cache) ✅")
-        assert os.path.exists("data/cache/R_10_900.json"), "fichier cache manquant"
+        assert os.path.exists("data/cache/JD10_900.json"), "fichier cache manquant"
     finally:
         p.close()
 
@@ -130,7 +130,7 @@ def t_reconnect():
 
 def main():
     print("=" * 64)
-    print("TEST ÉTAPE 1 — DerivProvider (R_10 / JD10 / BOOM1000)")
+    print("TEST ÉTAPE 1 — DerivProvider (JD10 / BOOM1000)")
     print("=" * 64)
     passed = 0
     for name, fn in CHECKS:

@@ -28,7 +28,7 @@ PAPER_PAIRS: Dict[Tuple[str, str], Tuple[str, float]] = {
     ("BOOM1000", "bullish"): ("C-spk-P50", 3.0),
 }
 # Rails §9 (copie exacte recherche — parité testée, ne pas tuner ici).
-RAILS = {"BOOM1000": (10.0, 75.0), "JD10": (20.0, 300.0), "V10": (10.0, 75.0)}
+RAILS = {"BOOM1000": (10.0, 75.0), "JD10": (20.0, 300.0)}
 ATR_CAP = 3.0
 EXPIRY_BARS = 96
 

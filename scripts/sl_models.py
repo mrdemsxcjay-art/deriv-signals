@@ -31,10 +31,10 @@ from src.backtest.history import load_cache  # noqa: E402
 from src.signals.tracker import resolve_signal  # noqa: E402
 from src.synthetics.context import detect_jumps, detect_spikes  # noqa: E402
 
-SYM = {"V10": "R_10", "JD10": "JD10", "BOOM1000": "BOOM1000"}
+SYM = {"JD10": "JD10", "BOOM1000": "BOOM1000"}
 TP_MULTS = (1.5, 2.0, 2.5, 3.0, 3.5, 4.0)
 # Rails §9 (sécurité, pas du tuning) : [min_abs, max_abs], cap ATR relatif.
-RAILS = {"BOOM1000": (10.0, 75.0), "JD10": (20.0, 300.0), "V10": (10.0, 75.0)}
+RAILS = {"BOOM1000": (10.0, 75.0), "JD10": (20.0, 300.0)}
 ATR_CAP = 3.0
 
 

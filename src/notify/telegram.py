@@ -25,7 +25,7 @@ log = logging.getLogger("notify.telegram")
 API_URL = "https://api.telegram.org/bot{token}/sendMessage"
 TIMEOUT = 20
 
-LABELS = {"V10": "Volatility 10 Index", "JD10": "Jump 10 Index",
+LABELS = {"JD10": "Jump 10 Index",
           "BOOM1000": "Boom 1000 Index"}
 SIDES = {"bullish": ("🟢", "ACHAT"), "bearish": ("🔴", "VENTE")}
 DISCLAIMER = ("⚠️ <i>Analyse automatique — aucun ordre exécuté. "

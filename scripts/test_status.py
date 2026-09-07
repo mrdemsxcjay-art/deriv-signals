@@ -67,7 +67,7 @@ def t_real():
     assert abs(stats["by_inst"]["BOOM1000"]["r"] - 12.0) < 1e-9
     m = build(settings(), rows, stats)
     for needle in ("🤖 Robot signaux Deriv — statut", "En ligne",
-                   "🟢 JD10", "🟢 BOOM1000", "⏸️ V10", "Seuil 65",
+                   "🟢 JD10", "🟢 BOOM1000", "Seuil 65",
                    "+23.0R", "93</b><span>signaux au total",
                    "PAR INSTRUMENT", ">JD10</td><td>37</td>", "7 jours", "R moyen",
                    "29 TP / 64 SL / 0 EX", "</th><th>Stop</th><th>Objectif</th>",

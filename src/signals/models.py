@@ -19,8 +19,8 @@ def utc_iso(epoch: int) -> str:
 @dataclass
 class Signal:
     id: str                      # "{INSTRUMENT}-{bullish|bearish}-{epoch_barre_M15}" (C1 : déterministe)
-    instrument: str              # "V10" | "JD10" | "BOOM1000"
-    symbol: str                  # "R_10" | "JD10" | "BOOM1000"
+    instrument: str              # "JD10" | "BOOM1000"
+    symbol: str                  # "JD10" | "BOOM1000"
     direction: str               # "bullish" | "bearish"
     created_epoch: int
     entry_epoch: int             # epoch de la bougie M15 de référence (suivi tracker)

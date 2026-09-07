@@ -9,7 +9,6 @@ Portes (tout doit s'aligner) :
 5. M5/M30 : timing — confirmation (engulfing/pin bar) = BONUS +10, jamais bloquante.
 
 Spécialisations :
-- V10 : symétrique pur.
 - JD10 : symétrique + SL ≥ max(plancher, 1,5 × jump médian des 20 derniers) +
   risque JUMP repensé (SL vs distribution : ÉLEVÉ < médiane, MOYEN < P90, FAIBLE ≥ P90).
 - BOOM1000 : asymétrique — SELL pipeline complet (setup principal) ; BUY uniquement
@@ -238,10 +237,6 @@ def jump_risk_label(sl_pts: float, med: Optional[float],
 def context_aligned(instrument: str, direction: str, ctx: dict, sl_pts: float,
                     P: Dict[str, Any]) -> Tuple[bool, str]:
     """Bonus +10 contexte (§6) — règles par instrument (provisoires, replay étape 4)."""
-    if instrument == "V10":
-        pct = ctx["vol"]["percentile"]
-        ok = pct is not None and P.get("v10_lo", 33) <= pct <= P.get("v10_hi", 66)
-        return ok, f"V10 : percentile ATR {pct} dans [33,66] : {ok}"
     if instrument == "JD10":
         p90 = (ctx.get("jump") or {}).get("p90_size")
         ok = p90 is not None and sl_pts >= p90
@@ -339,8 +334,6 @@ def _finish(instrument: str, direction: str, gates: List[GateResult], tf: dict,
         if direction == BEAR and hi is not None:
             confluences.append(f"distance au dernier spike : {hi - entry:+.1f} pts "
                                f"(un spike peut stopper ce SELL)")
-    if instrument == "V10":
-        snapshot["v10"] = dict(ctx.get("v10") or {})
     return Decision(instrument, direction, True, gates=gates, score=score,
                     grade=grade, breakdown=breakdown,
                     features={"retest_in_zone": g4.data.get("in_zone", False),

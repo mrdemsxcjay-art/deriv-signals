@@ -60,7 +60,7 @@ BOOM_SIG = {
     },
 }
 
-SETTINGS = {"instruments": {"V10": {"enabled": False}, "JD10": {"enabled": True},
+SETTINGS = {"instruments": {"JD10": {"enabled": True},
                             "BOOM1000": {"enabled": True}},
             "scoring": {"threshold": 65, "cooldown_minutes": 180,
                         "max_per_day_per_instrument": 4},
@@ -99,11 +99,12 @@ def t_boom():
 def t_test():
     m = format_test(SETTINGS)
     for needle in ("TEST", "Robot signaux Deriv", "Connexion bot OK",
-                   "JD10", "BOOM1000", "⏸️ en pause", "V10",
+                   "JD10", "BOOM1000",
                    "Seuil 65", "cooldown 180", "4/j/instrument", "1,00 $",
                    "aucun ordre exécuté"):
         assert needle in m, needle
     assert "TELEGRAM" not in m and "token" not in m.lower()
+    assert "en pause" not in m  # V10 supprime : aucun instrument en pause
     m_all = format_test({"instruments": {"JD10": {}}, "scoring": {}, "account": {}})
     assert "en pause" not in m_all  # rien à signaler si tout actif
     print("   TEST complet, 0 secret ✅")

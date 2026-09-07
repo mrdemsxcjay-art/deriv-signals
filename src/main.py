@@ -4,7 +4,7 @@ Point d'entrée du robot — Étape 1 : vérification données Deriv.
 Usage :
     python -m src.main --once              # 1 cycle : télécharge + valide tout, affiche le résumé
     python -m src.main --once --fast       # idem avec 100 bougies/TF (rapide, pour CI)
-    python -m src.main --symbol R_10       # un seul instrument
+    python -m src.main --symbol JD10       # un seul instrument
 """
 from __future__ import annotations
 
@@ -103,7 +103,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Robot signaux Deriv")
     ap.add_argument("--once", action="store_true", help="Contrôle données unique puis quitte")
     ap.add_argument("--cycle", action="store_true", help="Cycle d'analyse complet (Étape 3+)")
-    ap.add_argument("--symbol", default=None, help="Un seul symbole API (ex : R_10)")
+    ap.add_argument("--symbol", default=None, help="Un seul symbole API (ex : JD10)")
     ap.add_argument("--fast", action="store_true", help="100 bougies/TF (rapide, pour CI)")
     ap.add_argument("--settings", default="config/settings.yaml")
     args = ap.parse_args()

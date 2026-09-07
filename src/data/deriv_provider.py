@@ -35,7 +35,7 @@ TIMEFRAMES: Dict[str, int] = {
 }
 
 # Symboles API Deriv — RÈGLE N°1 : rien d'autre ne doit être demandé.
-ALLOWED_SYMBOLS = {"R_10", "JD10", "BOOM1000"}
+ALLOWED_SYMBOLS = {"JD10", "BOOM1000"}
 
 # Granularité auxiliaire (hors des 6 TF stratégiques) : M1 (60 s) réservé à la
 # DÉTECTION des jumps JD10 — mesuré Étape 2 : le M5 est trop grossier, un jump
@@ -172,7 +172,7 @@ class DerivProvider:
         if symbol not in ALLOWED_SYMBOLS:
             raise ValueError(
                 f"Symbole '{symbol}' refusé — Je suis configuré uniquement pour "
-                f"V10 / JD10 / BOOM1000 pour maximiser la précision."
+                f"JD10 / BOOM1000 pour maximiser la précision."
             )
         if granularity not in ALLOWED_GRANULARITIES:
             raise ValueError(f"Granularité {granularity}s non supportée (cf. TIMEFRAMES).")
@@ -285,7 +285,7 @@ class DerivProvider:
         if symbol not in ALLOWED_SYMBOLS:
             raise ValueError(
                 f"Symbole '{symbol}' refusé — Je suis configuré uniquement pour "
-                f"V10 / JD10 / BOOM1000 pour maximiser la précision."
+                f"JD10 / BOOM1000 pour maximiser la précision."
             )
         do_cache = self.use_cache if use_cache is None else use_cache
         cache_path = os.path.join(self.cache_dir, f"{symbol}_ticks.json")

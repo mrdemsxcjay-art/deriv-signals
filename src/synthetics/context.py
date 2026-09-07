@@ -91,18 +91,6 @@ def vol_stats(m15: Sequence[dict], atr_period: int = 14,
     return {"atr_m15": cur, "percentile": pct, "regime": regime, "n_m15": len(m15)}
 
 
-def v10_context(m5: Sequence[dict], m15: Sequence[dict], atr_period: int = 14,
-                percentile_days: int = 30, speed_window: int = 100) -> dict:
-    """V10 : ATR M15 + percentile 30 j (régime) + vitesse moyenne des bougies M5."""
-    vol = vol_stats(m15, atr_period, percentile_days)
-    bodies = [abs(c["close"] - c["open"]) for c in m5[-speed_window:]]
-    return {"atr_m15": vol["atr_m15"],
-            "atr_percentile_30d": vol["percentile"],
-            "regime": vol["regime"],
-            "candle_speed_pts_per_min": (sum(bodies) / len(bodies) / 5.0) if bodies else None,
-            "n_m15": len(m15), "n_m5": len(m5)}
-
-
 def boom_context(m5: Sequence[dict], h1: Sequence[dict], granularity_m5: int = 300,
                  window: int = 100, multiplier: float = 3.0, stats_window: int = 50,
                  spikes: Optional[List[dict]] = None) -> dict:

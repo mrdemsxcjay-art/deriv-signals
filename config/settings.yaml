@@ -1,6 +1,6 @@
 # ============================================================
 # ROBOT DE SIGNAUX — INDICES SYNTHÉTIQUES DERIV
-# V10 (R_10) · JD10 (Jump 10) · BOOM1000 — analyse uniquement
+# JD10 (Jump 10) · BOOM1000 — analyse uniquement (V10 supprime le 07/09/2026)
 # 100 % gratuit — aucun ordre exécuté, signaux Telegram only
 # ============================================================
 
@@ -16,10 +16,6 @@ deriv:
 
 # --- Instruments EXCLUSIFS (règle n°1 non-négociable) ---
 instruments:
-  V10:
-    symbol: "R_10"
-    label: "Volatility 10 Index"
-    enabled: false  # Étape 4 validée : PAUSE (0 TP / 243 signaux, 42 j, 2 régimes)
   JD10:
     symbol: "JD10"
     label: "Jump 10 Index"
@@ -81,7 +77,6 @@ synthetics:
 
 # --- Planchers SL provisoires (points) — À RECALIBRER par replay ≥ 21 j (étape 4) ---
 stops:
-  V10: 25
   JD10: 40
   BOOM1000: 25  # Étape 4 : 50→25 (optimum intérieur, grille 60→20 ; 20 = falaise)
 
@@ -106,8 +101,6 @@ strategy:
   strength_min: 0.5          # corps/range bougie signal
   regime_lo: 10              # bonus régime : percentile ATR dans [10, 90]
   regime_hi: 90
-  v10_lo: 33                 # bonus contexte V10 : percentile dans [33, 66]
-  v10_hi: 66
   boom_sell_spike_mult: 2.0  # SELL aligné si spike ≤ 2 × intervalle moyen
   boom_buy_max_age_min: 20  # Étape 4 : 45→20 — BUY uniquement si spike ≤ 20 min
   jump_sl_mult: 4.0         # Étape 4 : 1.5→4.0 — SL JD10 ≥ 4,0 × jump médian (grille monotone, plateau 4.0=5.0)

@@ -24,9 +24,8 @@ from src.analysis.candles import atr_value  # noqa: E402
 from src.analysis.indicators import ema_value  # noqa: E402
 from src.backtest.history import load_cache  # noqa: E402
 
-SYM = {"V10": "R_10", "JD10": "JD10", "BOOM1000": "BOOM1000"}
-XGRID = {"BOOM1000": (25, 30, 35, 40, 50), "JD10": (40, 60, 80, 100, 150),
-         "V10": (25, 30, 40, 50, 60)}
+SYM = {"JD10": "JD10", "BOOM1000": "BOOM1000"}
+XGRID = {"BOOM1000": (25, 30, 35, 40, 50), "JD10": (40, 60, 80, 100, 150)}
 
 
 def regime_of(d1, entry_epoch, entry):

@@ -1,12 +1,12 @@
 # 🤖 Robot de Signaux — Indices Synthétiques Deriv
 
-**V10 (`R_10`) · Jump 10 (`JD10`) · Boom 1000 (`BOOM1000`) — 100 % gratuit, analyse uniquement.**
+**Jump 10 (`JD10`) · Boom 1000 (`BOOM1000`) — 100 % gratuit, analyse uniquement (V10 supprimé le 07/09/2026).**
 
 Le robot **n'exécute AUCUN ordre** : il analyse et envoie des signaux Telegram.
 Aucune carte bancaire, aucune clé payante. Données : WebSocket Deriv officielle (app_id public gratuit).
 
-> Règle n°1 : toute demande hors V10 / JD10 / BOOM1000 reçoit :
-> « Je suis configuré uniquement pour V10 / JD10 / BOOM1000 pour maximiser la précision. »
+> Règle n°1 : toute demande hors JD10 / BOOM1000 reçoit :
+> « Je suis configuré uniquement pour JD10 / BOOM1000 pour maximiser la précision. »
 
 ---
 
@@ -60,7 +60,7 @@ deriv-signals/
 | 2 | Indicateurs + SMC (BOS/CHoCH/OB/FVG) + contexte synthétique (spikes/jumps) | ✅ en validation |
 | — | ⚠️ Corrections de spec mesurées (voir § Calibration) : JD10 ≈ 3 jumps/heure (pas /3 h), détection jumps au tick, spike 3× (pas 4×), dérive BOOM = médiane H1 | 📋 à valider |
 | 3 | Pipeline 5 portes + spécialisations JD10/BOOM + scoring + SQLite | ✅ en validation |
-| 4 | Calibration replay 21 j + validation 21 j hors-échantillon (C3 : +13,0R calib / +6,9R valid ; V10 0/243 TP → ⏸️ pause V10 actée) | ✅ validée |
+| 4 | Calibration replay 21 j + validation 21 j hors-échantillon (C3 : +13,0R calib / +6,9R valid ; V10 0/243 TP → ⏸️ pause actée puis V10 supprimé le 07/09/2026) | ✅ validée |
 | 5 | Messages Telegram HTML + message TEST | ✅ validée |
 | 6 | Moteur GitHub Actions unique + cache base + page statut publique | ✅ validée |
 
@@ -90,7 +90,7 @@ Harness : pas 15 min sur bougies clôturées, fenêtres calibration [21→0 j] /
 | TP ratio | 3,0 | 3,0 (constante spec, codée en dur dans `tracker.py`) | non réglable sans refonte spec |
 
 Résultats (R / 21 j) — calibration : base −24,3 (175 signaux, 8,3/j) → **C3 +13,0** (152, 7,2/j). Validation : base −4,0 → **C3 +6,9** (103, 4,9/j).
-**V10 : 0 TP sur 243 signaux** (calib + valid, marché plat −0,45 % ET tendanciel −2,19 %) → ⏸️ **pause proposée**. Sans V10 : calib **+23R** (4,4/j) ; valid **+9R** (**2,3/j** ✓ cible 2-3/j).
+**V10 : 0 TP sur 243 signaux** (calib + valid, marché plat −0,45 % ET tendanciel −2,19 %) → ⏸️ **pause proposée puis suppression définitive le 07/09/2026**. Sans V10 : calib **+23R** (4,4/j) ; valid **+9R** (**2,3/j** ✓ cible 2-3/j).
 Pistes rejetées par mesure : seuil 50 (≈ base), SL V10 resserré (pire : −19 à −24R), fraîcheur H4, scores 85+ (toxiques : bonus « retest DANS zone » +10 contre-productif — retests à dist 0 : −5,4/−3,0/−13,0R).
 
 ## 📨 Notifications Telegram (étapes 5+)

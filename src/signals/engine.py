@@ -20,7 +20,7 @@ from ..agents.strategy_agent import evaluate_instrument
 from ..data.deriv_provider import DerivProvider
 from ..storage import database as db
 from ..synthetics.context import (
-    boom_context, detect_jumps, jump_context, v10_context, vol_stats,
+    boom_context, detect_jumps, jump_context, vol_stats,
 )
 from .models import Signal
 from .tracker import update_all as tracker_update
@@ -70,9 +70,7 @@ def build_contexts(instrument: str, tf: Dict[str, list],
                    ticks: Optional[list], P: Dict[str, Any]) -> Dict[str, Any]:
     S = P.get("synthetics_params", {})
     ctx: Dict[str, Any] = {"vol": vol_stats(tf["M15"])}
-    if instrument == "V10":
-        ctx["v10"] = v10_context(tf["M5"], tf["M15"])
-    elif instrument == "BOOM1000":
+    if instrument == "BOOM1000":
         ctx["boom"] = boom_context(tf["M5"], tf["H1"],
                                    multiplier=S.get("spike_multiplier", 3.0))
     elif instrument == "JD10":

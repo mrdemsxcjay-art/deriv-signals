@@ -231,7 +231,7 @@ analyse seule, 0 ordre, 100 % gratuit</p>
 <table><tr><th>Heure UTC</th><th>Instr.</th><th>Sens</th><th>Score</th>
 <th>Entrée</th><th>Stop</th><th>Objectif</th><th>Statut</th></tr>{trs}</table>
 <p class="foot">⚠️ Analyse automatique — aucun ordre exécuté, pas un conseil financier.
-· V10 en pause (étape 4 : 0 TP / 243 signaux).</p></body></html>
+· V10 supprimé le 07/09/2026 (étape 4 : 0 TP / 243 signaux).</p></body></html>
 """
 
 

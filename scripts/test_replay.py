@@ -21,7 +21,7 @@ from src.backtest.views import (
 )
 from src.data.deriv_provider import DerivProvider
 from src.synthetics.context import (
-    boom_context, detect_spikes, jump_context, v10_context, vol_stats,
+    boom_context, detect_spikes, jump_context, vol_stats,
 )
 
 CHECKS = []
@@ -119,9 +119,7 @@ def t_fidelity():
                         "H4": filter_prep(views[sym]["H4"], n["H4"], True),
                         "M15": filter_prep(views[sym]["M15"], n["M15"], True)}
                 ctx_f = {"vol": vol_stats(tf["M15"])}
-                if name == "V10":
-                    ctx_f["v10"] = v10_context(tf["M5"], tf["M15"])
-                elif name == "BOOM1000":
+                if name == "BOOM1000":
                     ctx_f["boom"] = boom_context(tf["M5"], tf["H1"])
                 else:
                     ctx_f["jump"] = frozen
@@ -168,7 +166,7 @@ def t_mini():
             assert k in rep.total or True
             for s in rep.per_instrument.values():
                 assert k in s, k
-        print(f"   5 cycles × {n_active} instr = {5 * n_active} lignes (V10 en pause), "
+        print(f"   5 cycles × {n_active} instr = {5 * n_active} lignes (JD10 + BOOM), "
               f"rapport complet ({rep.total['n']} signaux) ✅")
     finally:
         p.close()

@@ -23,7 +23,7 @@ from ..agents.strategy_agent import evaluate_instrument
 from ..signals.engine import active_instruments, process_decision
 from ..signals.tracker import resolve_signal
 from ..storage import database as db
-from ..synthetics.context import boom_context, jump_context, v10_context, vol_stats
+from ..synthetics.context import boom_context, jump_context, vol_stats
 from .views import build_symbol_views, count_closed, filter_prep, filter_spikes
 
 log = logging.getLogger("backtest.replay")
@@ -84,7 +84,7 @@ def run_replay(histories: Dict[str, Dict[str, list]], ticks_sample: List[dict],
         os.remove(db_path)
     db.init_db(db_path)
 
-    # --- paramètres (overrides pointés : "scoring.threshold", "stops.V10", ...) ---
+    # --- paramètres (overrides pointés : "scoring.threshold", "stops.JD10", ...) ---
     import copy
     settings = copy.deepcopy(settings)
     for dotted, val in (overrides or {}).items():
@@ -153,9 +153,7 @@ def run_replay(histories: Dict[str, Dict[str, list]], ticks_sample: List[dict],
                     "H4": filter_prep(v["H4"], n["H4"], True),
                     "M15": filter_prep(v["M15"], n["M15"], True)}
             ctx: Dict[str, Any] = {"vol": vol_stats(tf["M15"])}
-            if name == "V10":
-                ctx["v10"] = v10_context(tf["M5"], tf["M15"])
-            elif name == "BOOM1000":
+            if name == "BOOM1000":
                 ctx["boom"] = boom_context(
                     tf["M5"], tf["H1"],
                     multiplier=settings["synthetics"].get("spike_multiplier", 3.0),

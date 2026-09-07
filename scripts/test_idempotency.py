@@ -76,11 +76,11 @@ def fake_eval_factory(state):
 
 
 def base_settings(instruments=("BOOM1000",)):
-    sym = {"V10": "R_10", "JD10": "JD10", "BOOM1000": "BOOM1000"}
+    sym = {"JD10": "JD10", "BOOM1000": "BOOM1000"}
     return {"instruments": {n: {"symbol": sym[n]} for n in instruments},
             "timeframes": dict(GRANS), "counts": {k: 3 for k in GRANS},
             "strategy": {}, "synthetics": {},
-            "stops": {"V10": 25.0, "JD10": 40.0, "BOOM1000": 25.0},
+            "stops": {"JD10": 40.0, "BOOM1000": 25.0},
             "scoring": {"threshold": 65, "cooldown_minutes": 180,
                         "max_per_day_per_instrument": 4},
             "account": {"stake_usd": 1.0}}
