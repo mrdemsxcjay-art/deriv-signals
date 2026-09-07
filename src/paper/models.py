@@ -16,6 +16,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional, Tuple
 
 from ..analysis.candles import atr_value
+from ..analysis.indicators import ema_value
 from ..analysis.order_blocks import active_zones, detect_order_blocks
 from ..analysis.structure import detect_structure
 from ..signals.tracker import resolve_signal
@@ -147,3 +148,61 @@ def resolve_paper(paper_sig: Dict[str, Any], m15: List[dict],
         o["r"] = -1.0
         o["points"] = -float(paper_sig["sl_pts"])
     return o
+
+
+# Version des regles paper : tout changement invalide l observation en cours
+# (garde de gel : regle 6 du protocole paper, verifiee chaque cycle).
+PAPER_RULES_VERSION = 1
+
+
+def config_fingerprint() -> str:
+    """Empreinte du protocole paper (gel des paramètres, règle 6)."""
+    import hashlib
+    import json
+    cfg = {"v": PAPER_RULES_VERSION,
+           "pairs": sorted((k[0], k[1], v[0], v[1])
+                           for k, v in PAPER_PAIRS.items()),
+           "rails": RAILS, "atr_cap": ATR_CAP, "expiry": EXPIRY_BARS}
+    return hashlib.sha256(json.dumps(cfg, sort_keys=True).encode()).hexdigest()[:16]
+
+
+def mae_mfe(direction: str, entry: float, m15: List[dict],
+            entry_epoch: int, closed_epoch: int):
+    """MAE/MFE (portage EXACT de la recherche analyze_trades.py).
+
+    Fenêtre = entrée → clôture (entry_epoch < epoch ≤ closed_epoch).
+    bull : MAE = entry − min low ; MFE = max high − entry (miroir bear).
+    """
+    after = [b for b in m15 if entry_epoch < b["epoch"] <= closed_epoch]
+    if not after:
+        return 0.0, 0.0
+    if direction == "bullish":
+        return (entry - min(b["low"] for b in after),
+                max(b["high"] for b in after) - entry)
+    return (max(b["high"] for b in after) - entry,
+            entry - min(b["low"] for b in after))
+
+
+def regime_of(d1: List[dict], entry_epoch: int, entry: float):
+    """Régime D1 causal (portage EXACT de la recherche).
+
+    Retourne (dist_atr, bucket) ou (None, None) si < 200 bougies.
+    """
+    prior = [c for c in d1 if c["epoch"] <= entry_epoch]
+    if len(prior) < 200:
+        return None, None
+    closes = [c["close"] for c in prior]
+    ema = ema_value(closes, 200)
+    atr = atr_value(prior, 14)
+    if ema is None or not atr:
+        return None, None
+    dist = (entry - ema) / atr
+    if dist < -1.0:
+        bucket = "bear_profond"
+    elif dist < -0.25:
+        bucket = "bear_modere"
+    elif dist <= 0.25:
+        bucket = "neutre"
+    else:
+        bucket = "bull"
+    return round(dist, 3), bucket

@@ -29,6 +29,7 @@ from .tracker import update_all as tracker_update
 @dataclass
 class CycleResult:
     signals: List[Signal] = field(default_factory=list)
+    paper: Dict[str, Any] = field(default_factory=dict)
     logs: Dict[str, str] = field(default_factory=dict)
     tracker: List[dict] = field(default_factory=list)
     errors: List[str] = field(default_factory=list)
@@ -187,6 +188,17 @@ def run_cycle(settings: Dict[str, Any], db_path: Optional[str] = None,
     now = now_epoch if now_epoch is not None else int(time.time())
     db_path = db_path or settings.get("storage", {}).get("path", "data/signals.db")
     db.init_db(db_path)
+    # Paper H-SL-ADAPTIVE (miroir, live inchange - decision 07/09/2026).
+    paper_cfg = settings.get("paper", {})
+    paper_on = bool(paper_cfg.get("enabled", False))
+    paper_db = paper_cfg.get("db_path", "data/paper.db")
+    if paper_on:
+        from ..paper import sync as paper_sync  # lazy : comme notify, 0 risque d'import
+        try:
+            paper_sync.check_frozen(paper_db)
+        except Exception as exc:
+            res.errors.append(f"paper GELE : {exc}")
+            paper_on = False
     own_provider = provider is None
     if own_provider:
         cfg = settings["deriv"]
@@ -248,6 +260,12 @@ def run_cycle(settings: Dict[str, Any], db_path: Optional[str] = None,
                         res.logs[inst_name] = line
                         continue
                     res.signals.append(sig)
+                    if paper_on:
+                        try:
+                            line += paper_sync.mirror_signal(
+                                paper_db, sig, tf, sig.entry_epoch + 900, now)
+                        except Exception as exc:  # noqa: BLE001 - le paper ne bloque jamais le live
+                            res.errors.append(f"paper miroir {sig.id}: {exc}")
                 res.logs[inst_name] = line
             except Exception as exc:  # noqa: BLE001
                 res.logs[inst_name] = f"❌ erreur données/stratégie : {exc}"
@@ -258,6 +276,17 @@ def run_cycle(settings: Dict[str, Any], db_path: Optional[str] = None,
                 expiry_bars=P.get("expiry_bars_m15", 96))
         except Exception as exc:  # noqa: BLE001
             res.errors.append(f"tracker: {exc}")
+        if paper_on:
+            try:
+                paper_closed = paper_sync.update_paper(
+                    paper_db, provider, P.get("expiry_bars_m15", 96))
+                n_snap = paper_sync.snapshot_live_closes(
+                    paper_db, db_path, provider, res.tracker or [])
+                res.paper = {"closed": len(paper_closed),
+                             "r_closed": round(sum(o["r"] for o in paper_closed), 2),
+                             "live_snapshots": n_snap}
+            except Exception as exc:  # noqa: BLE001 - le paper ne bloque jamais le live
+                res.errors.append(f"paper: {exc}")
         if notify:  # étape 5+ : entrées + clôtures, idempotent (C1)
             try:
                 from ..notify.telegram import notify_closes, notify_signals

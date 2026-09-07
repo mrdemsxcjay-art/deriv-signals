@@ -75,3 +75,25 @@ C-P50 BOOM : (1) TRAIN +6 vs FIXED ≤+0.5, OOS +14 vs +5 ✓ (2) OOS +0.304/PF1
 - max(structure,k×ATR) simple (préféré §19) battu par les formes pures : EXT OOS < FIXED des deux côtés, dominé par les rails.
 - S2 live-3 (top-tick, tous modèles SL) : problème ENTRÉE, pas SL → soutient C3. Biais VALIDATION o14⊂o7 BOOM documenté (inclusion totale, 0 signal nouveau).
 - Mémo C12 : tracker.py hardcode TP=+3R (production @3 non affectée ; tout TP≠3 exige R=+m + tests).
+
+## PAPER H-SL-ADAPTIVE — lancé 2026-09-07 (décision utilisateur : PAPER D'ABORD)
+
+Candidats EXPÉRIMENTAUX (pas des règles de production), suivis en miroir :
+- JD10 bearish : A2-ob-b0 @ TP4 vs baseline fixe 40 pts (OOS réf exp +0.394, n=37).
+- BOOM1000 bullish : C-spk-P50 @ TP3 vs baseline fixe 25 pts (OOS réf exp +0.304, n=47).
+Réserves notées : JD10 (échantillon limité, mono-régime, TP4 exige C12) > BOOM (ratio 3
+inchangé, DD ÷2.4, pas de changement tracker). C-P50 = candidat le plus rassurant.
+
+Règles verrouillées : (1) live STRICTEMENT inchangé ; (2) 0 ordre réel supplémentaire ;
+(3) miroir généré exactement au même moment que le signal live (même cycle, mêmes
+bougies clôturées) ; (4) fiche complète (entrée, SL fixe/adaptatif, TP, résultats des
+2 scénarios, MAE/MFE, durée, score, régime, timestamp, latence) ; (5) comparaison
+systématique LIVE BASELINE vs PAPER ; (6) paramètres GELÉS (garde mécanique :
+empreinte config vérifiée chaque cycle, dérive = paper désactivé + erreur visible) ;
+(7) INTERDICTION de ré-optimiser sur les résultats paper ; (8) résultats conservés
+même si sous-performance (base paper auto-suffisante, snapshots baseline inclus).
+
+Durée : min 1-2 semaines + N signaux suffisant. Rapport final imposé (Instrument,
+Modèle, Signaux, WR, Expectancy, R total, DD, MAE, MFE, Baseline, Verdict).
+Critère : activation réelle UNIQUEMENT si le paper confirme les refs OOS, sinon
+KEEP CURRENT LIVE. AUCUNE activation automatique.

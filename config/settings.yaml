@@ -116,6 +116,11 @@ strategy:
 storage:
   path: "data/signals.db"
 
+# --- Paper trading H-SL-ADAPTIVE (miroir, live inchangé — décision 07/09/2026) ---
+paper:
+  enabled: true
+  db_path: "data/paper.db"
+
 # --- Scoring / émission (Étape 3-4, rappelés ici pour traçabilité) ---
 scoring:
   threshold: 65

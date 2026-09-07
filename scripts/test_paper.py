@@ -19,8 +19,11 @@ sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
 
 import sl_models as RESEARCH  # noqa: E402 — recherche validée OOS (référence)
+import analyze_trades as ARESEARCH  # noqa: E402 — MAE/MFE/régimes (référence)
 from src.paper import models as PM  # noqa: E402
 from src.paper import store as PStore  # noqa: E402
+from src.paper import sync as PSync  # noqa: E402
+from src.storage import database as db  # noqa: E402
 
 
 def C(epoch, o, h, low, close):
@@ -236,6 +239,148 @@ def t6_store():
     print("T6 store OK (roundtrip + idempotence + stats)")
 
 
+def d1_trend(e0, n=250, base=5000.0):
+    return [C(e0 + i * 86400, base + i * 2 - 1, base + i * 2 + 1,
+              base + i * 2 - 1.5, base + i * 2) for i in range(n)]
+
+
+def t7_regime():
+    d1 = d1_trend(1_600_000_000)
+    e = d1[-1]["epoch"]
+    entry = d1[-1]["close"]
+    assert PM.regime_of(d1, e, entry) == ARESEARCH.regime_of(d1, e, entry)
+    assert PM.regime_of(d1, e, entry)[1] == "bull"
+    assert PM.regime_of(d1[:199], e, entry) == (None, None)
+    assert ARESEARCH.regime_of(d1[:199], e, entry) == (None, None)
+    print(f"T7 regime OK ({PM.regime_of(d1, e, entry)} == recherche)")
+
+
+def t8_mae_mfe():
+    bars = [C(100, 0, 0, 0, 0),  # a l'entry : exclu
+            C(200, 99, 101, 98, 100),
+            C(300, 100, 108, 95, 107),
+            C(400, 107, 109, 99, 100)]  # apres close : exclu
+    assert PM.mae_mfe("bullish", 100.0, bars, 100, 300) == (5.0, 8.0)
+    assert PM.mae_mfe("bearish", 100.0, bars, 100, 300) == (8.0, 5.0)
+    assert PM.mae_mfe("bullish", 100.0, bars, 100, 100) == (0.0, 0.0)
+    print("T8 MAE/MFE OK (fenetre entree->cloture, bull/bear/vide)")
+
+
+class FakeProv:
+    def __init__(self, m15_by_sym):
+        self.m = m15_by_sym
+
+    def get_candles(self, symbol, gran, count):
+        assert gran == 900
+        return self.m[symbol][-count:]
+
+
+def t9_sync():
+    m15, m5 = boom_tf()
+    e = m15[-1]["epoch"]
+    be = m15[-1]["close"]
+    d1 = d1_trend(e - 249 * 86400, base=be - 498.0)  # D1 cale sur l'entree
+    tf = {"M15": m15, "M5": m5, "D1": d1}
+    now = e + 60
+    live = {"id": f"BOOM1000-bullish-{e}", "instrument": "BOOM1000",
+            "direction": "bullish", "created_epoch": now, "entry_epoch": e,
+            "entry": be, "sl_pts": 25.0, "tp_pts": 75.0,
+            "sl_price": be - 25.0, "tp_price": be + 75.0, "confidence": 70,
+            "grade": "B"}
+    _fdp, fdp = tempfile.mkstemp(suffix=".db")
+    os.close(_fdp)
+    _fdl, fdl = tempfile.mkstemp(suffix=".db")
+    os.close(_fdl)
+    try:
+        PSync.check_frozen(fdp)
+        frag = PSync.mirror_signal(fdp, live, tf, e + 900, now)
+        assert "C-spk-P50@TP3" in frag and "(fixe 25)" in frag, frag
+        frag2 = PSync.mirror_signal(fdp, live, tf, e + 900, now)
+        assert "(déjà)" in frag2, frag2  # idempotent
+        opens = PStore.get_open(fdp)
+        assert len(opens) == 1, opens
+        row = opens[0]
+        assert row["score"] == 70 and row["sl_fixed_pts"] == 25.0
+        assert row["regime"] == "bull" and row["compute_ms"] >= 0
+        # Resolution paper : montee franche -> TP +3R.
+        sl, tp = row["sl_price"], row["tp_price"]
+        fut = [C(e + 900 * i, be + (tp - be) * i / 4,
+               be + (tp - be) * i / 4 + 1, sl + 5,
+               be + (tp - be) * i / 4) for i in range(1, 5)]
+        prov = FakeProv({"BOOM1000": m15 + fut})
+        closed = PSync.update_paper(fdp, prov)
+        assert len(closed) == 1 and closed[0]["r"] == 3.0, closed
+        assert closed[0]["mae_pts"] >= 0 and closed[0]["mfe_pts"] > 0
+        assert PStore.get_open(fdp) == []
+        # Snapshot baseline : le live a SL pendant ce temps.
+        db.init_db(fdl)
+        import sqlite3
+        with sqlite3.connect(fdl) as con:
+            con.execute(
+                """INSERT INTO signals (id, instrument, symbol, direction,
+                       created_epoch, entry_epoch, entry, sl_pts, tp_pts,
+                       sl_price, tp_price, stake_usd, confidence, grade)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (live["id"], "BOOM1000", "BOOM1000", "bullish", now, e, be,
+                 25.0, 75.0, be - 25.0, be + 75.0, 1.0, 70, "B"))
+        lo = {"signal_id": live["id"], "closed_epoch": e + 2700, "result": "SL",
+              "r": -1.0, "points": -25.0, "bars_held": 3, "exit_price": be - 25.0,
+              "note": "", "_fresh": True}
+        assert PSync.snapshot_live_closes(fdp, fdl, prov, [lo]) == 1
+        outs = PStore.get_outcomes(fdp)
+        assert outs[0]["live_result"] == "SL" and outs[0]["live_r"] == -1.0
+        assert outs[0]["live_mae_pts"] >= 0
+        # Garde de gel : trip si l'empreinte derive.
+        PStore.set_meta(fdp, "fingerprint", "trafiquee")
+        try:
+            PSync.check_frozen(fdp)
+            raise AssertionError("gel non detecte !")
+        except ValueError:
+            pass
+    finally:
+        os.remove(fdp)
+        os.remove(fdl)
+    print("T9 sync OK (miroir idempotent, TP +3R, snapshot live, gel)")
+
+
+def t10_report():
+    sys.path.insert(0, os.path.join(ROOT, "scripts"))
+    import paper_report as PR
+    fd, path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    try:
+        PStore.init_db(path)
+        PStore.set_meta(path, "protocol", "test")
+        for i, (res, r) in enumerate((("TP", 3.0), ("SL", -1.0))):
+            pid = f"L{i}:C-spk-P50@TP3"
+            PStore.save_signal(path, {"id": pid, "live_id": f"L{i}",
+                                      "instrument": "BOOM1000", "direction": "bullish",
+                                      "entry_epoch": 100 * (i + 1), "entry": 5000.0,
+                                      "pair": "C-spk-P50", "m": 3.0, "sl_pts": 22.0,
+                                      "tp_pts": 66.0, "sl_price": 4978.0,
+                                      "tp_price": 5066.0, "raw_sl": 20.0,
+                                      "sl_fixed_pts": 25.0, "score": 70}, 100 * (i + 1))
+            PStore.close_signal(path, {"signal_id": pid, "closed_epoch": 1000 * (i + 1),
+                                       "result": res, "r": r, "points": r * 22.0,
+                                       "bars_held": 5, "exit_price": 5000.0,
+                                       "mae_pts": 10.0, "mfe_pts": 70.0})
+            PStore.snapshot_live_close(path, f"L{i}", "SL", -1.0, 4, 900 * (i + 1),
+                                       28.0, 8.0)
+        rep = PR.build_report(path)
+        assert len(rep["rows"]) == 1
+        r = rep["rows"][0]
+        assert (r["paper"]["n"], r["paper"]["WR"], r["paper"]["exp"],
+                r["paper"]["R"], r["paper"]["DD"]) == (2, 0.5, 1.0, 2.0, 1.0), r["paper"]
+        assert (r["baseline"]["n"], r["baseline"]["exp"],
+                r["baseline"]["R"]) == (2, -1.0, -2.0), r["baseline"]
+        assert (r["mae_med"], r["mfe_med"]) == (10.0, 70.0)
+        txt = PR.render(rep)
+        assert "EN COURS" in txt and "KEEP CURRENT LIVE" in txt
+    finally:
+        os.remove(path)
+    print("T10 rapport OK (metriques paper + baseline + DD)")
+
+
 def main():
     t1_r_math()
     t2_rails()
@@ -243,7 +388,11 @@ def main():
     t4_features()
     t5_e2e()
     t6_store()
-    print("\n✅ PAPER : 6/6 checks verts")
+    t7_regime()
+    t8_mae_mfe()
+    t9_sync()
+    t10_report()
+    print("\nPAPER : 10/10 checks verts")
 
 
 if __name__ == "__main__":
