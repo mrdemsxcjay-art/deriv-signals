@@ -46,3 +46,7 @@ pénalisé (méd 80, contexte 10/10, régime 9.5 ; 0 « score insuffisant » en 
    ne rien faire (le régime changera — preuve 28/08) ; ou re-discuter M15-âge / symétrie
    BOOM BUY via replay dédié. Vigilance : au push C1, le garde « ticks frais » ne doit
    pas fraiser JD10 à froid (cache CI à vérifier).
+
+## Validation utilisateur (07/09/2026)
+Conclusions validées : pas de souci JD10, aucune modification.
+Objectif : 4 max/j/instrument (config actuelle), le réel suit le marché, bilan hebdo.
