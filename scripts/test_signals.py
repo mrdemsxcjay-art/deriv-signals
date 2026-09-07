@@ -188,20 +188,28 @@ def t_db_antispam():
     assert (st["n"], st["TP"], st["winrate"], st["r_total"], st["open"]) == (1, 1, 1.0, 3.0, 1), st
     print("   SQLite round-trip + stats (1 TP, R+3) ✅")
 
-    # --- moteur : fake provider + décision factice ⇒ cooldown / quota / seuil ---
-    tiny = mk([10, 10.1, 10.2], [9.9, 10.0, 10.1], [10, 10.05, 10.1],
-              [10.05, 10.1, 10.15], base=10)
-    fake_tf = {k: tiny for k in ("D1", "H4", "H1", "M30", "M15", "M5")}
+    # --- moteur : fake provider TEMPORELLEMENT COHÉRENT (C1 : la garde
+    # fraîcheur exige des barres fraîches) + décision factice ancrée sur la barre.
+    GRANS = {"M5": 300, "M15": 900, "M30": 1800, "H1": 3600, "H4": 14400, "D1": 86400}
+
+    def fresh_bars(now, gran, n=3, price=10.0):
+        last_epoch = (now - 60 - gran) // gran * gran
+        return [{"epoch": last_epoch - (n - 1 - i) * gran, "open": price,
+                 "high": price + 0.1, "low": price - 0.1, "close": price + 0.05}
+                for i in range(n)]
 
     class FakeProvider:
+        def __init__(self, now):
+            self._now = now
+
         def get_timeframe(self, symbol, tf, count):
-            return fake_tf[tf]
+            return fresh_bars(self._now, GRANS[tf])
 
         def get_candles(self, symbol, gran, count):
-            return fake_tf["M15"]
+            return fresh_bars(self._now, gran)
 
         def get_ticks(self, symbol, count=2000, end="latest", use_cache=None, max_cache=40000):
-            return []
+            return [{"epoch": self._now - 60 + i, "price": 100.0} for i in range(25)]
 
         def close(self):
             pass
@@ -217,19 +225,25 @@ def t_db_antispam():
                 "account": {"stake_usd": 1.0}}
     NOON = (1_700_000_000 // 86400) * 86400 + 12 * 3600  # midi UTC (même jour +400 min)
     from src.agents.strategy_agent import Decision, GateResult
-    fake_dec = Decision("X", "bearish", True,
+    state = {"score": 78}
+
+    def fake_eval(instrument, tf, ctx, P, floors, prep=None):
+        return Decision(instrument, "bearish", True,
                         gates=[GateResult("D1", "bearish", True, "porte factice")],
-                        score=78, grade="A", breakdown={"base": 50},
+                        score=state["score"], grade="A", breakdown={"base": 50},
                         plan={"entry": 10.0, "sl_pts": 25.0, "tp_pts": 75.0,
-                              "sl_price": 35.0, "tp_price": -65.0, "entry_epoch": NOON},
+                              "sl_price": 35.0, "tp_price": -65.0,
+                              "entry_epoch": tf["M15"][-1]["epoch"]},
                         confluences=["factice"], context_snapshot={})
+
     real_eval = ENG.evaluate_instrument
-    ENG.evaluate_instrument = lambda *a, **k: fake_dec
+    ENG.evaluate_instrument = fake_eval
     try:
         tmp2 = os.path.join(tempfile.mkdtemp(), "m.db")
-        r1 = run_cycle(settings, db_path=tmp2, provider=FakeProvider(), now_epoch=NOON)
+        r1 = run_cycle(settings, db_path=tmp2, provider=FakeProvider(NOON), now_epoch=NOON)
         assert len(r1.signals) == 3, [s.id for s in r1.signals]
-        r2 = run_cycle(settings, db_path=tmp2, provider=FakeProvider(), now_epoch=NOON + 600)
+        r2 = run_cycle(settings, db_path=tmp2, provider=FakeProvider(NOON + 600),
+                       now_epoch=NOON + 600)
         assert len(r2.signals) == 0 and all("cooldown" in v for v in r2.logs.values()), r2.logs
         for i in range(4):  # quota V10 (4/jour déjà émis dans run1+prefill → bloque)
             db.save_signal(tmp2, {"id": f"pre-{i}", "instrument": "V10", "symbol": "R_10",
@@ -237,11 +251,11 @@ def t_db_antispam():
                                   "entry_epoch": 1, "entry": 1.0, "sl_pts": 1.0, "tp_pts": 3.0,
                                   "sl_price": 2.0, "tp_price": -2.0, "stake_usd": 1.0,
                                   "confidence": 70, "grade": "B"})
-        r3 = run_cycle(settings, db_path=tmp2, provider=FakeProvider(),
+        r3 = run_cycle(settings, db_path=tmp2, provider=FakeProvider(NOON + 200 * 60),
                        now_epoch=NOON + 200 * 60)
         assert "quota" in r3.logs["V10"] and len(r3.signals) == 2, r3.logs
-        fake_dec.score = 60
-        r4 = run_cycle(settings, db_path=tmp2, provider=FakeProvider(),
+        state["score"] = 60
+        r4 = run_cycle(settings, db_path=tmp2, provider=FakeProvider(NOON + 400 * 60),
                        now_epoch=NOON + 400 * 60)
         assert len(r4.signals) == 0 and all("score 60 < 65" in v for v in r4.logs.values())
     finally:

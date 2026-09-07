@@ -71,7 +71,11 @@ def update_all(db_path: str, provider: Any, expiry_bars: int = 96,
         for s in sigs:
             out = resolve_signal(s, m15, expiry_bars)
             if out is not None:
-                db.close_signal(db_path, out)
+                status = db.close_signal(db_path, out)
+                out = dict(out)
+                # C1 : seule une clôture FRAÎCHE est notifiable (les
+                # re-résolutions 'already' ne renotifient jamais).
+                out["_fresh"] = (status == "inserted")
                 outcomes.append(out)
     return [o for o in outcomes if o["result"] != "ERROR"] + \
            [o for o in outcomes if o["result"] == "ERROR"]

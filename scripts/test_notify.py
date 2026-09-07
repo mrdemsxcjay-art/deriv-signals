@@ -194,20 +194,29 @@ def t_wiring():
     from src.agents.strategy_agent import Decision, GateResult
     from src.notify import telegram as TG
     from src.signals import engine as ENG
-    tiny = [{"epoch": 10 + i, "open": 10.0, "high": 10.1, "low": 9.9,
-             "close": 10.05} for i in range(3)]
-    fake_tf = {k: tiny for k in ("D1", "H4", "H1", "M30", "M15", "M5")}
+    GRANS = {"M5": 300, "M15": 900, "M30": 1800, "H1": 3600, "H4": 14400, "D1": 86400}
+
+    def fresh_bars(now, gran, n=3, price=10.0):
+        last_epoch = (now - 60 - gran) // gran * gran
+        return [{"epoch": last_epoch - (n - 1 - i) * gran, "open": price,
+                 "high": price + 0.1, "low": price - 0.1, "close": price + 0.05}
+                for i in range(n)]
 
     class FakeProvider:
+        """Bougies fraiches ancrees sur `now` (C1 : garde fraicheur)."""
+
+        def __init__(self, now):
+            self._now = now
+
         def get_timeframe(self, symbol, tf, count):
-            return fake_tf[tf]
+            return fresh_bars(self._now, GRANS[tf])
 
         def get_candles(self, symbol, gran, count):
-            return fake_tf["M15"]
+            return fresh_bars(self._now, gran)
 
         def get_ticks(self, symbol, count=2000, end="latest", use_cache=None,
                       max_cache=40000):
-            return []
+            return [{"epoch": self._now - 60 + i, "price": 100.0} for i in range(25)]
 
         def close(self):
             pass
@@ -223,12 +232,15 @@ def t_wiring():
                 "scoring": {"threshold": 65, "cooldown_minutes": 180,
                             "max_per_day_per_instrument": 4},
                 "account": {"stake_usd": 1.0}}
-    fake_dec = Decision("X", "bearish", True,
+    state = {"score": 78}
+
+    def fake_eval(instrument, tf, ctx, P, floors, prep=None):
+        return Decision(instrument, "bearish", True,
                         gates=[GateResult("D1", "bearish", True, "porte factice")],
-                        score=78, grade="A", breakdown={"base": 50},
+                        score=state["score"], grade="A", breakdown={"base": 50},
                         plan={"entry": 10.0, "sl_pts": 25.0, "tp_pts": 75.0,
                               "sl_price": 35.0, "tp_price": -65.0,
-                              "entry_epoch": NOON},
+                              "entry_epoch": tf["M15"][-1]["epoch"]},
                         confluences=["factice"], context_snapshot={})
     calls = []
 
@@ -238,16 +250,16 @@ def t_wiring():
                  "status": "sent"} for s in sigs]
 
     real_eval, real_notify = ENG.evaluate_instrument, TG.notify_signals
-    ENG.evaluate_instrument = lambda *a, **k: fake_dec
+    ENG.evaluate_instrument = fake_eval
     TG.notify_signals = fake_notify
     try:
         tmp = os.path.join(tempfile.mkdtemp(), "w.db")
-        res = ENG.run_cycle(settings, db_path=tmp, provider=FakeProvider(),
+        res = ENG.run_cycle(settings, db_path=tmp, provider=FakeProvider(NOON),
                             now_epoch=NOON, notify=True)
         assert len(res.signals) == 2 and len(calls) == 2, (res.signals, calls)
         assert all(v.endswith("📩") for v in res.logs.values()), res.logs
         assert res.errors == [], res.errors
-        res2 = ENG.run_cycle(settings, db_path=tmp, provider=FakeProvider(),
+        res2 = ENG.run_cycle(settings, db_path=tmp, provider=FakeProvider(NOON + 200 * 60),
                              now_epoch=NOON + 200 * 60, notify=False)
         assert len(res2.signals) == 2 and len(calls) == 2  # silencieux
     finally:
@@ -297,20 +309,29 @@ def t_close_wiring():
     from src.notify import telegram as TG
     from src.signals import engine as ENG
     from src.storage import database as db
-    tiny = [{"epoch": 10 + i, "open": 10.0, "high": 10.1, "low": 9.9,
-             "close": 10.05} for i in range(3)]
-    fake_tf = {k: tiny for k in ("D1", "H4", "H1", "M30", "M15", "M5")}
+    GRANS = {"M5": 300, "M15": 900, "M30": 1800, "H1": 3600, "H4": 14400, "D1": 86400}
+
+    def fresh_bars(now, gran, n=3, price=10.0):
+        last_epoch = (now - 60 - gran) // gran * gran
+        return [{"epoch": last_epoch - (n - 1 - i) * gran, "open": price,
+                 "high": price + 0.1, "low": price - 0.1, "close": price + 0.05}
+                for i in range(n)]
 
     class FakeProvider:
+        """Bougies fraiches ancrees sur `now` (C1 : garde fraicheur)."""
+
+        def __init__(self, now):
+            self._now = now
+
         def get_timeframe(self, symbol, tf, count):
-            return fake_tf[tf]
+            return fresh_bars(self._now, GRANS[tf])
 
         def get_candles(self, symbol, gran, count):
-            return fake_tf["M15"]
+            return fresh_bars(self._now, gran)
 
         def get_ticks(self, symbol, count=2000, end="latest", use_cache=None,
                       max_cache=40000):
-            return []
+            return [{"epoch": self._now - 60 + i, "price": 100.0} for i in range(25)]
 
         def close(self):
             pass
@@ -332,6 +353,7 @@ def t_close_wiring():
                          "sl_pts": 25.0, "tp_pts": 75.0, "sl_price": 125.0,
                          "tp_price": 25.0, "stake_usd": 1.0, "confidence": 75,
                          "grade": "A"})
+    db.mark_notified(tmp, "BOOM1000-bearish-1", "entry", NOON)  # entrée déjà notifiée (live)
     close = {"signal_id": "BOOM1000-bearish-1", "result": "SL", "r": -1.0,
              "points": -25.0, "bars_held": 5, "exit_price": 125.0,
              "closed_epoch": NOON + 4500, "note": ""}
@@ -351,7 +373,7 @@ def t_close_wiring():
     ENG.tracker_update = lambda *a, **k: [close, err]
     TG.notify_closes = fake_closes
     try:
-        res = ENG.run_cycle(settings, db_path=tmp, provider=FakeProvider(),
+        res = ENG.run_cycle(settings, db_path=tmp, provider=FakeProvider(NOON + 5400),
                             now_epoch=NOON + 5400, notify=True)
         assert len(calls) == 1 and calls[0][1]["result"] == "SL", calls
         assert calls[0][0]["entry"] == 100.0  # signal relu depuis la base

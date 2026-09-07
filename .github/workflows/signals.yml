@@ -51,15 +51,33 @@ jobs:
           path: data/cache
           key: deriv-cache-${{ github.run_id }}
           restore-keys: deriv-cache-
+      # C1 — synchroniser l'état AVANT analyse : un run retry/attente part d'un
+      # SHA figé à sa création ; sans sync il rejouerait (et renotifierait) des
+      # signaux déjà traités. Échec ici = arrêt AVANT toute notification.
+      - name: Synchroniser l'état (anti-doublon inter-runs)
+        run: |
+          git fetch origin main
+          git merge --ff-only origin/main || \
+            (echo "❌ base divergente : arrêt avant analyse (0 notification)" && exit 1)
       - name: Cycle live + Telegram
         run: python scripts/live_once.py --db data/signals.db
       - name: Page statut
+        if: always()
         run: python scripts/make_status.py --db data/signals.db --out docs/index.html
+      # C1 — commit même sur run rouge (flags notified_* persistés) + push réessayé :
+      # sans ceci, notify-puis-rollback ⇒ renotification au run suivant.
       - name: Commit état + statut
+        if: always()
         run: |
           git config user.name "deriv-bot"
           git config user.email "deriv-bot@users.noreply.github.com"
           git add data/signals.db docs/index.html
           git diff --cached --quiet && echo "rien à committer" && exit 0
           git commit -m "🤖 live : $(date -u '+%d/%m %H:%M UTC')"
-          git pull --rebase && git push
+          ok=0
+          for i in 1 2 3; do
+            git pull --rebase && git push && ok=1 && break
+            echo "⚠️ push tentative $i échouée, nouvel essai..."
+            sleep 5
+          done
+          [ "$ok" = "1" ] || (echo "❌ push impossible après 3 essais" && exit 1)

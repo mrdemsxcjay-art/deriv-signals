@@ -126,11 +126,23 @@ scoring:
   max_per_day_per_instrument: 4
   cooldown_minutes: 180
 
+# --- Fraîcheur des données (C1 — garde fail-closed : périmé ⇒ NO_TRADE) ---
+freshness:
+  # Âge max (minutes) de la dernière bougie CLÔTURÉE par timeframe (≈3× TF).
+  # Mesuré le 07/09/2026 (nominal) : M5 2 min, M15/M30 7 min, H1 37 min,
+  # H4 217 min, D1 457 min — limites ≈3× le nominal max (cron + délais GitHub).
+  max_age_min: {M5: 15, M15: 45, M30: 90, H1: 180, H4: 720, D1: 4320}
+  ticks_max_age_min: 60  # JD10 : dernier tick (nominal < 2 min)
+
 # --- Telegram (secrets via variables d'environnement en prod) ---
 telegram:
   # En local : export TELEGRAM_BOT_TOKEN=... TELEGRAM_CHAT_ID=...
   # En CI : secrets GitHub TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID
   parse_mode: "HTML"
+  # C1 — fenêtres de rattrapage des notifications impayées (runs précédents).
+  # Au-delà : enterrées (-1), jamais envoyées (prix devenu irréaliste).
+  entry_retry_min: 120
+  close_retry_hours: 24
 
 logging:
   level: "INFO"   # DEBUG | INFO | WARNING | ERROR
