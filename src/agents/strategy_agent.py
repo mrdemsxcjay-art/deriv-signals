@@ -322,7 +322,8 @@ def _finish(instrument: str, direction: str, gates: List[GateResult], tf: dict,
     if rsi_ok:
         confluences.append(f"RSI H1 {rsi:.1f} avec marge (+5)")
     snapshot = {"sl_note": sl_note, "rsi_h1": rsi, "timing": conf_detail,
-                "vol": ctx["vol"]}
+                "vol": ctx["vol"], "score": score, "grade": grade,
+                "score_breakdown": breakdown}
     if instrument == "JD10":
         j = ctx.get("jump") or {}
         label, detail = jump_risk_label(sl_pts, j.get("median_size"), j.get("p90_size"))

@@ -98,6 +98,8 @@ def _synthetic_lines(ctx: Dict[str, Any]) -> List[str]:
                      f"(P90 {_f1(jump.get('p90_size'))}, max {_f1(jump.get('max_size'))})")
         lines.append(f"• Dernier jump : il y a {_fi(jump.get('time_since_jump_min'))} min "
                      f"({esc(jump.get('last_jump_direction', '?'))})")
+        if jump.get("n_jumps") is not None:
+            lines.append(f"• Jumps détectés : {_fi(jump.get('n_jumps'))}")
         if ctx.get("jump_risk"):
             lines.append(f"• Risque JUMP : <b>{esc(ctx['jump_risk'])}</b>")
         if ctx.get("jump_risk_detail"):
@@ -108,6 +110,14 @@ def _synthetic_lines(ctx: Dict[str, Any]) -> List[str]:
                      f"(amplitude ~{_f1(boom.get('amplitude_med'))} pts)")
         lines.append(f"• Dérive : {_f1(boom.get('drift_pts_per_hour'))} pts/h · "
                      f"spikes détectés : {_fi(boom.get('n_spikes'))}")
+        if boom.get("avg_interval_min") is not None:
+            lines.append(f"• Intervalle spikes : moyen {_f1(boom.get('avg_interval_min'))} min "
+                         f"(médian {_f1(boom.get('median_interval_min'))})")
+        if boom.get("amplitude_p90") is not None:
+            lines.append(f"• Amplitude spikes : P90 {_f1(boom.get('amplitude_p90'))} pts "
+                         f"(max {_f1(boom.get('amplitude_max'))})")
+        if boom.get("dist_to_spike") is not None:
+            lines.append(f"• Distance au dernier spike : {_f1(boom.get('dist_to_spike'))} pts")
     if ctx.get("rsi_h1") is not None:
         lines.append(f"• RSI H1 : {_f1(ctx['rsi_h1'])}")
     if ctx.get("sl_note"):
@@ -117,31 +127,90 @@ def _synthetic_lines(ctx: Dict[str, Any]) -> List[str]:
     return lines or ["• Contexte indisponible"]
 
 
+def _as_list(raw: Any) -> List[Any]:
+    """Normalise gates/confluences : Signal (liste) ou ligne base (JSON str)."""
+    if not raw:
+        return []
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except (ValueError, TypeError):
+            return []
+    return list(raw) if isinstance(raw, (list, tuple)) else []
+
+
+def _as_ctx(raw: Any) -> Dict[str, Any]:
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, str):
+        try:
+            parsed = json.loads(raw)
+        except (ValueError, TypeError):
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+    return {}
+
+
+def _gates_lines(gates: List[Any]) -> List[str]:
+    out = []
+    for gt in gates:
+        if isinstance(gt, dict):
+            name, ok, detail = gt.get("name", "?"), gt.get("passed"), gt.get("detail", "")
+        else:
+            name = getattr(gt, "name", "?")
+            ok, detail = getattr(gt, "passed", None), getattr(gt, "detail", "")
+        mark = "✅" if ok else ("❌" if ok is False else "⚪")
+        out.append(f"{mark} {esc(name)} : {esc(detail)}" if detail else f"{mark} {esc(name)}")
+    return out
+
+
 def format_signal(sig: Any) -> str:
-    """Message d'entrée : sens + prix + score + contexte synthétique."""
+    """Message d'entrée détaillé : plan + score + portes + confluences + contexte."""
     g = (lambda k, d=None: sig.get(k, d)) if isinstance(sig, dict) else (lambda k, d=None: getattr(sig, k, d))
     emoji, side = SIDES.get(g("direction"), ("⚪", esc(g("direction"))))
     instrument = g("instrument", "?")
     label = LABELS.get(instrument, instrument)
-    confs = g("confluences") or []
+    confs = _as_list(g("confluences")) or _as_list(g("confluences_json"))
+    gates = _as_list(g("gates")) or _as_list(g("gates_json"))
+    ctx = _as_ctx(g("context")) or _as_ctx(g("context_json"))
+    try:
+        ratio = float(g("tp_pts")) / float(g("sl_pts"))
+        gain_line = (f"💰 <b>Gain potentiel :</b> +{_f2(float(g('stake_usd')) * ratio)} $ "
+                     f"({_f1(ratio)}R)")
+    except (TypeError, ValueError, ZeroDivisionError):
+        gain_line = ""
+    bd = ctx.get("score_breakdown") or {}
+    parts = " · ".join(f"{k} +{bd[k]}" for k in
+                       ("base", "zone", "confirmation", "contexte", "régime", "force", "rsi")
+                       if isinstance(bd, dict) and k in bd)
+    bd_line = f"🧮 Détail : {esc(parts)}" if parts else ""
+    bar_line = (f"🕒 Barre M15 : {_hm(g('entry_epoch'))} UTC" if g("entry_epoch") else "")
     lines = [
         f"{emoji} <b>{side} · {esc(instrument)}</b>",
         f"{esc(label)} · {_hm(g('created_epoch', 0))} UTC",
+        *([bar_line] if bar_line else []),
         "",
         f"💰 <b>Entrée :</b> <code>{_f2(g('entry'))}</code>",
         f"🛑 <b>Stop :</b> <code>{_f2(g('sl_price'))}</code> (−{_f1(g('sl_pts'))} pts)",
         f"🎯 <b>Objectif :</b> <code>{_f2(g('tp_price'))}</code> (+{_f1(g('tp_pts'))} pts)",
         f"📐 Ratio 1:3 · 💵 Risque {_f2(g('stake_usd'))} $",
+        *([gain_line] if gain_line else []),
         "",
         f"⭐ <b>{_fi(g('confidence'))}/100 · Grade {esc(g('grade'))}</b>",
-        *[f"✅ {esc(c)}" for c in confs],
-        "",
-        "🧪 <b>CONTEXTE SYNTHÉTIQUE</b>",
-        *_synthetic_lines(g("context") or {}),
-        "",
-        f"🆔 <code>{esc(g('id'))}</code>",
-        DISCLAIMER,
+        *([bd_line] if bd_line else []),
     ]
+    if gates:
+        lines += ["", "🚪 <b>PORTES</b>", *_gates_lines(gates)]
+    gdetails = set()
+    for gt in gates:
+        dt = gt.get("detail", "") if isinstance(gt, dict) else getattr(gt, "detail", "")
+        if dt:
+            gdetails.add(str(dt).strip())
+    confs = [c for c in confs if str(c).strip() not in gdetails]
+    if confs:
+        lines += ["", *[f"✅ {esc(c)}" for c in confs]]
+    lines += ["", "🧪 <b>CONTEXTE SYNTHÉTIQUE</b>", *_synthetic_lines(ctx),
+              "", f"🆔 <code>{esc(g('id'))}</code>", DISCLAIMER]
     return "\n".join(lines)
 
 
@@ -185,12 +254,38 @@ def format_outcome(sig: Any, out: Any, stats: dict | None = None) -> str:
     st = stats or {}
     wr = st.get("winrate")
     wr_str = f"{100 * wr:.0f} %" if isinstance(wr, (int, float)) else "—"
+    targets = ""
+    if gs("sl_price") is not None or gs("tp_price") is not None:
+        targets = (f"🛑 Stop <code>{_f2(gs('sl_price'))}</code> (−{_f1(gs('sl_pts'))} pts) · "
+                   f"🎯 Objectif <code>{_f2(gs('tp_price'))}</code> (+{_f1(gs('tp_pts'))} pts)")
+    setup = ""
+    if gs("confidence") is not None:
+        setup = f"⭐ Signal d'origine : {_fi(gs('confidence'))}/100 · Grade {esc(gs('grade'))}"
+    period = ""
+    if gs("created_epoch") is not None and go("closed_epoch") is not None:
+        period = f"🕒 Du {_hm(gs('created_epoch'))} au {_hm(go('closed_epoch'))} UTC"
+    note_line = f"📝 Note : {esc(go('note'))}" if go("note") else ""
+    cumul = (f"📈 Cumul : <b>{_r_str(st.get('r_total'))}</b> · {_fi(st.get('TP'))} TP / "
+             f"{_fi(st.get('SL'))} SL · winrate {wr_str}")
+    extra = []
+    if st.get("EXPIRE"):
+        extra.append(f"{_fi(st.get('EXPIRE'))} EXPIRE")
+    if st.get("n"):
+        extra.append(f"{_fi(st.get('n'))} clôturé{'s' if st.get('n') != 1 else ''}")
+    if st.get("r_avg") is not None:
+        extra.append(f"moy {_r_str(st.get('r_avg'))}/trade")
+    if extra:
+        cumul += " · " + " · ".join(extra)
     lines = [
         f"{emoji} <b>{word} · {esc(instrument)} {esc(side)}</b>",
         f"💰 Entrée <code>{_f2(gs('entry'))}</code> → Sortie <code>{_f2(go('exit_price'))}</code>",
+        *([targets] if targets else []),
         f"📊 Résultat : <b>{_r_str(go('r'))}</b> ({pts_str})",
+        *([setup] if setup else []),
         f"⏱️ Tenue : {_duree(go('bars_held'))} ({_fi(go('bars_held'))} × M15)",
-        f"📈 Cumul : <b>{_r_str(st.get('r_total'))}</b> · {_fi(st.get('TP'))} TP / {_fi(st.get('SL'))} SL · winrate {wr_str}",
+        *([period] if period else []),
+        *([note_line] if note_line else []),
+        cumul,
         "",
         f"🆔 <code>{esc(gs('id'))}</code> · clôturé le {_hm(go('closed_epoch'))} UTC",
     ]

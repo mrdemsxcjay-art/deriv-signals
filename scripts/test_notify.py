@@ -385,6 +385,72 @@ def t_close_wiring():
     print("   1 clôture notifiée + 📪 · ERROR ignorée · 0 entrée ✅")
 
 
+FAT_SIG = {
+    "id": "FAT", "instrument": "BOOM1000", "direction": "bearish",
+    "created_epoch": 1725630000, "entry_epoch": 1725629100, "entry": 14681.07,
+    "sl_pts": 25.0, "tp_pts": 75.0, "sl_price": 14706.07, "tp_price": 14606.07,
+    "stake_usd": 1.0, "confidence": 75, "grade": "A",
+    "gates": [{"name": "D1", "passed": True, "detail": "D1 baissier <x>"},
+              {"name": "M15", "passed": True, "detail": "retest 0.3 ATR"}],
+    "confluences": ["c1"],
+    "context": {"score_breakdown": {"base": 50, "zone": 10, "confirmation": 0,
+                                    "contexte": 10, "régime": 10, "force": 5, "rsi": 0},
+                "vol": {"regime": "normal", "atr_m15": 18.6, "percentile": 49.0},
+                "boom": {"time_since_spike_min": 25.0, "amplitude_med": 20.9,
+                         "drift_pts_per_hour": -5.7, "n_spikes": 138,
+                         "avg_interval_min": 35.7, "median_interval_min": 20.0,
+                         "amplitude_p90": 36.6, "amplitude_max": 56.0,
+                         "dist_to_spike": 15.1}},
+}
+
+
+@check("DÉTAIL — entrée/clôture enrichies + lignes base + limites")
+def t_detail():
+    import json as _json
+    m = format_signal(FAT_SIG)
+    for needle in ("🚪", "PORTES", "✅ D1 : D1 baissier", "✅ M15 : retest",
+                   "🧮 Détail : base +50", "zone +10", "régime +10",
+                   "Gain potentiel", "+3,00 $", "(3,0R)", "Barre M15",
+                   "Intervalle spikes", "moyen 35,7", "P90 36,6",
+                   "Distance au dernier spike", "15,1"):
+        assert needle in m, needle
+    assert "<x>" not in m and "&lt;x&gt;" in m  # détail porte échappé
+    assert len(m) < 4096
+    # Ligne base (JSON str) : mêmes sections, pas de fallback.
+    db_row = {"id": "DB", "instrument": "JD10", "direction": "bullish",
+              "created_epoch": 1725630000, "entry": 90000.0,
+              "sl_pts": 40.0, "tp_pts": 120.0, "sl_price": 89960.0,
+              "tp_price": 90120.0, "stake_usd": 1.0, "confidence": 70,
+              "grade": "B",
+              "gates_json": _json.dumps([{"name": "D1", "passed": True,
+                                           "detail": "ok"}]),
+              "confluences_json": _json.dumps(["cc"]),
+              "context_json": _json.dumps({"vol": {"regime": "tendu"}})}
+    m2 = format_signal(db_row)
+    assert "PORTES" in m2 and "✅ cc" in m2 and "tendu" in m2
+    assert "Contexte indisponible" not in m2
+    # Clôture enrichie.
+    mo = format_outcome(
+        {**OUTCOME_SIG, "sl_price": 14706.07, "tp_price": 14606.07,
+         "sl_pts": 25.0, "tp_pts": 75.0, "confidence": 75, "grade": "A",
+         "created_epoch": 1725630900},
+        {"signal_id": OUTCOME_SIG["id"], "result": "SL", "r": -1.0,
+         "points": -25.0, "bars_held": 5, "exit_price": 14706.07,
+         "closed_epoch": 1725635400, "note": "SL avant TP <y>"},
+        {**OUTCOME_STATS, "n": 45, "r_avg": 0.093})
+    for needle in ("Stop <code>14706,07</code>", "Objectif <code>14606,07</code>",
+                   "Signal d'origine : 75/100 · Grade A", "Du 06/09",
+                   "Note : SL avant TP", "5 EXPIRE", "45 clôturés", "moy +0,1R"):
+        assert needle in mo, needle
+    assert "<y>" not in mo and "&lt;y&gt;" in mo
+    # Minimal : jamais de crash, sections sautées.
+    m3 = format_signal({"id": "MIN"})
+    assert "PORTES" not in m3 and "Détail" not in m3 and "🆔" in m3
+    m4 = format_outcome({"id": "MIN"}, {"result": "SL"}, None)
+    assert "winrate —" in m4
+    print("   portes + breakdown + base JSON + clôture + robustesse ✅")
+
+
 def main():
     print("=" * 64)
     print("TEST ÉTAPE 5 — Telegram (format + TEST + envoi)")
